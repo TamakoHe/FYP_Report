@@ -1,6 +1,5 @@
 .DS_Store
 *Zone.Identifier
-*.pdf
 *.zip
 ## Core latex/pdflatex auxiliary files:
 *.aux
