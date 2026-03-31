@@ -40,7 +40,8 @@ parskip, % Uncomment to add space between paragraphs
 
 \newcommand{\degree}{Engineering} % Your degree name, this is used in the title page and abstract, print it elsewhere with \degree
 \newcommand{\subject}{Electric & Electronic Engineering} % Your subject area, this is not currently used anywhere in the template, print it elsewhere with \subject
-\newcommand{\keywords}{} % Keywords for your thesis, this is not currently used anywhere in the template, print it elsewhere with \keywords
+\newcommand{\keywords}{Joint Communication and Control, Data Compression, Networked Control Systems, Robotic Manipulators, Event-Triggered Control, 
+Linear Quadratic Regulator.} % Keywords for your thesis, this is not currently used anywhere in the template, print it elsewhere with \keywords
 \newcommand{\university}{\href{https://www.uestc.edu.cn/}{UETSC}} % Your university's name and URL, this is used in the title page and abstract, print it elsewhere with \university
 \newcommand{\department}{\href{http://www.gla.uestc.edu.cn/}{Glasgow College}} % Your department's name and URL, this is used in the title page and abstract, print it elsewhere with \department
 
@@ -167,7 +168,24 @@ $2^{nd}$ Supervisor:\\
 %----------------------------------------------------------------------------------------
 
 \begin{abstract}
+The design of Joint Communication and Control (JCC) systems is critical for modern cyber-physical applications,
+where strict bandwidth constraints often lead to network congestion, packet delays, and severe control instability.
+Within this paradigm, developing efficient data compression techniques that maintain control performance is a fundamental 
+challenge. To address this, this thesis investigates control-aware comprehensive testbed to validate the proposed model 
+and algorithmic designs. 
 
+First, an Event-Triggered Control (ETC) mechanism is implemented to reduce communication frequency in the time domain, 
+transmitting sensor data only when the state deviation exceeds a predefined error threshold. Second, to minimize the payload 
+of each necessary transmission, a sensitivity-based weighted bit allocation algorithm is developed in the spatial domain.
+By leveraging the sensitivity matrix (Hessian) derived from the Linear Quadratic Regulator (LQR), the algorithm dynamically 
+allocates quantization bits based on the physical control-criticality of different robotic joints--for instance, prioritizing 
+base joints over end-effectors.
+
+Simulations conducted on the robotic manipulator platform demonstrate the superiority of the proposed framework. 
+The co-design of ETC and LQR-weighted compression substantially reduces the overall communication payload while effectively 
+mitigating trajectory jittering and preserving near-ideal tracking precision under extreme resource constraints. This research
+successfully validates the proposed JCC data compression models, highlighting their immense potential in enhancing the resilience 
+and efficiency of resource-constrained networked control systems.
 \end{abstract}
 
 %----------------------------------------------------------------------------------------

@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>联合通信与控制 (JCC) 交互式研究报告</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Chosen Palette: Warm Neutrals & Subtle Slate/Teal Accents -->
+    <!-- Application Structure Plan: A single-page dashboard with a sidebar navigation. The structure is thematic, moving from the "Problem Context" to "Spatial Compression (LQR)", then "Temporal Compression (DQN)", and finally the "Future Roadmap (Multi-Agent/NMPC)". This logical flow guides the user from the fundamental challenges of Networked Control Systems to the specific algorithmic solutions, and finally to the grand vision, making complex control theory digestible through interactive data visualizations. -->
+    <!-- Visualization & Content Choices: 
+         1. LQR Bit Allocation (Goal: Compare) -> Bar Chart (Chart.js Canvas) -> Toggle between Uniform and LQR-weighted -> Shows how sensitive joints get more bandwidth. NO SVG.
+         2. LQR Cost Reduction (Goal: Inform) -> Doughnut Chart (Chart.js Canvas) -> Hover interactions -> Justifies the LQR algorithm by showing cost reduction. NO SVG.
+         3. DQN Trajectory Tracking (Goal: Change/Compare) -> Line Chart (Chart.js Canvas) -> Interactive legend to isolate Ideal vs Periodic vs DQN -> Shows tracking precision. NO SVG.
+         4. Communication Barcode (Goal: Organize/Inform) -> Bar Chart (0 or 1 values) (Chart.js Canvas) -> Synchronized mentally with the trajectory chart -> Visualizes pragmatic communication ("speaking only when necessary"). NO SVG. 
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        background: '#f8fafc', // slate-50
+                        surface: '#ffffff',
+                        primary: '#0f172a', // slate-900
+                        accent: '#0ea5e9', // sky-500
+                        success: '#10b981', // emerald-500
+                        warning: '#f59e0b', // amber-500
+                        danger: '#ef4444' // red-500
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+
+        /* Mandatory Chart Container Styling */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 100%; /* Adapts to parent */
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        @media (min-width: 1024px) {
+            .chart-container {
+                height: 400px;
+            }
+        }
+
+        /* Nav Item Active State */
+        .nav-active {
+            background-color: #e2e8f0; /* slate-200 */
+            border-left: 4px solid #0ea5e9; /* sky-500 */
+            font-weight: 600;
+        }
+
+        /* Fade transition classes */
+        .fade-enter {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        .fade-enter-active {
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 300ms, transform 300ms;
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden antialiased">
+
+    <!-- Sidebar Navigation -->
+    <aside class="w-64 bg-surface border-r border-slate-200 flex flex-col h-full flex-shrink-0 z-10 hidden md:flex">
+        <div class="p-6 border-b border-slate-200">
+            <h1 class="text-xl font-bold text-primary leading-tight">JCC 研究框架</h1>
+            <p class="text-xs text-slate-500 mt-2">联合通信与控制协同设计</p>
+        </div>
+        <nav class="flex-1 overflow-y-auto py-4">
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="navigate('overview')" id="nav-overview" class="w-full text-left px-6 py-3 text-sm text-slate-700 hover:bg-slate-100 transition-colors nav-active">
+                        &#128203; 研究背景与痛点
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navigate('lqr')" id="nav-lqr" class="w-full text-left px-6 py-3 text-sm text-slate-700 hover:bg-slate-100 transition-colors">
+                        &#128200; 空间域：LQR加权压缩
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navigate('dqn')" id="nav-dqn" class="w-full text-left px-6 py-3 text-sm text-slate-700 hover:bg-slate-100 transition-colors">
+                        &#9201; 时间域：DQN智能触发
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navigate('future')" id="nav-future" class="w-full text-left px-6 py-3 text-sm text-slate-700 hover:bg-slate-100 transition-colors">
+                        &#127760; 路线图：多智能体与NMPC
+                    </button>
+                </li>
+            </ul>
+        </nav>
+        <div class="p-4 border-t border-slate-200 text-xs text-slate-400 text-center">
+            基于 Topic 6 课题构建
+        </div>
+    </aside>
+
+    <!-- Mobile Header (Visible only on small screens) -->
+    <div class="md:hidden fixed top-0 left-0 right-0 h-16 bg-surface border-b border-slate-200 flex items-center justify-between px-4 z-20">
+        <h1 class="text-lg font-bold text-primary">JCC 研究框架</h1>
+        <select id="mobile-nav" onchange="navigate(this.value)" class="bg-slate-100 border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-accent focus:border-accent block p-2">
+            <option value="overview">研究背景</option>
+            <option value="lqr">LQR加权压缩</option>
+            <option value="dqn">DQN智能触发</option>
+            <option value="future">演进路线图</option>
+        </select>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto p-6 md:p-10 pt-20 md:pt-10 bg-background relative" id="main-content">
+        
+        <!-- SECTION 1: Overview -->
+        <section id="sec-overview" class="max-w-5xl mx-auto opacity-100 transition-opacity duration-300">
+            <header class="mb-8">
+                <span class="inline-block px-3 py-1 bg-slate-200 text-slate-700 rounded-full text-xs font-semibold tracking-wide mb-3">01 / INTRODUCTION</span>
+                <h2 class="text-3xl font-bold text-primary mb-4">分布式系统中的通信与控制挑战</h2>
+                <p class="text-lg text-slate-600 leading-relaxed">
+                    本报告模块旨在阐述网络化控制系统（NCS）在严格带宽限制下面临的核心矛盾。用户可在此了解传统“通信与控制分离”假设为何在极端条件下失效，并认识到联合通信与控制（JCC）框架的必要性。
+                </p>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-surface rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <div class="text-3xl mb-4">&#128683;</div>
+                    <h3 class="text-xl font-bold mb-2">传统方案的痛点</h3>
+                    <p class="text-slate-600 text-sm leading-relaxed mb-4">
+                        传统范式通常依赖于<strong>周期性数据传输</strong>和<strong>均匀的状态量化</strong>。在带宽受限时，这种盲目的传输会导致严重的量化误差、网络拥塞，最终引发物理轨迹的剧烈偏离或系统失稳。
+                    </p>
+                    <ul class="text-sm text-slate-500 space-y-2">
+                        <li>&#x2022; 忽略物理状态的控制关键度 (Criticality)</li>
+                        <li>&#x2022; 导致高频无用数据的堆积</li>
+                        <li>&#x2022; 在危险状态缺乏足够带宽自救</li>
+                    </ul>
+                </div>
+                <div class="bg-surface rounded-2xl shadow-sm border border-slate-200 p-6 border-t-4 border-t-accent">
+                    <div class="text-3xl mb-4">&#128161;</div>
+                    <h3 class="text-xl font-bold mb-2">JCC 协同设计解法</h3>
+                    <p class="text-slate-600 text-sm leading-relaxed">
+                        本课题提出针对多自由度物理信息系统的联合通信与控制（JCC）框架，专注于<strong>面向控制的数据压缩</strong>和<strong>智能传输触发</strong>。
+                    </p>
+                    <div class="mt-4 flex flex-col space-y-3">
+                        <div class="flex items-center text-sm font-medium text-slate-700 bg-slate-50 p-2 rounded">
+                            <span class="text-accent mr-2">&#9632;</span> 空间域：基于敏感度的加权比特分配
+                        </div>
+                        <div class="flex items-center text-sm font-medium text-slate-700 bg-slate-50 p-2 rounded">
+                            <span class="text-accent mr-2">&#9632;</span> 时间域：基于深度强化学习的语用通信触发
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-slate-800 text-white rounded-2xl p-8 text-center shadow-lg">
+                <h3 class="text-2xl font-bold mb-4">核心目标 (Topic 6)</h3>
+                <p class="text-slate-300 max-w-2xl mx-auto italic">
+                    "Explore data compression methods that maintain control accuracy while reducing communication load."
+                </p>
+                <div class="mt-6 inline-block bg-slate-700 px-4 py-2 rounded-lg text-sm">
+                    预期结果：使用不足 20% 的通信率，达到近乎 100% 带宽的理想追踪精度。
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: LQR Compression -->
+        <section id="sec-lqr" class="max-w-5xl mx-auto hidden opacity-0 transition-opacity duration-300">
+            <header class="mb-8">
+                <span class="inline-block px-3 py-1 bg-accent/10 text-accent rounded-full text-xs font-semibold tracking-wide mb-3">02 / SPATIAL COMPRESSION</span>
+                <h2 class="text-3xl font-bold text-primary mb-4">基于 LQR 敏感度的加权数据压缩</h2>
+                <p class="text-lg text-slate-600 leading-relaxed">
+                    本模块展示空间域的数据压缩策略。用户可通过交互图表对比“均匀压缩”与“LQR加权压缩”在带宽分配和最终物理控制代价上的巨大差异。核心思想：不是所有自由度都一样重要。
+                </p>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <!-- Bit Allocation Chart -->
+                <div class="bg-surface rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold text-primary">信道带宽分配对比 (总预算: 16 bits)</h3>
+                        <div class="flex bg-slate-100 rounded-lg p-1">
+                            <button id="btn-uniform" onclick="updateLQRChart('uniform')" class="px-3 py-1 text-xs font-medium rounded-md bg-white shadow-sm text-slate-800">均匀分配</button>
+                            <button id="btn-weighted" onclick="updateLQRChart('weighted')" class="px-3 py-1 text-xs font-medium rounded-md text-slate-500 hover:text-slate-800">LQR加权</button>
+                        </div>
+                    </div>
+                    <div class="flex-1 w-full relative">
+                        <!-- Chart Container -->
+                        <div class="chart-container">
+                            <canvas id="bitAllocationChart"></canvas>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-4 text-center" id="lqr-chart-desc">
+                        传统均匀分配将带宽平均分配给所有关节，忽略了底座关节的微小误差会引发巨大的末端偏移。
+                    </p>
+                </div>
+
+                <!-- Cost Comparison -->
+                <div class="bg-surface rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col">
+                    <h3 class="text-lg font-bold text-primary mb-2">面向控制的失真代价 (Control Cost)</h3>
+                    <p class="text-sm text-slate-500 mb-6">代价公式: $J = x^T Q x$，越低表示控制精度越高。</p>
+                    
+                    <div class="flex-1 w-full relative flex items-center justify-center">
+                        <!-- Chart Container -->
+                        <div class="chart-container" style="max-height: 280px;">
+                            <canvas id="costComparisonChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 p-4 bg-emerald-50 rounded-lg border border-emerald-100">
+                        <p class="text-sm text-emerald-800 font-medium text-center">
+                            &#128640; 性能跃升：在相同极低带宽下，LQR 加权分配通过保全高敏感度状态，将整体控制代价降低了近 <span class="text-xl font-bold">80%</span>。
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <h4 class="font-bold text-slate-800 mb-3">算法原理摘要</h4>
+                <p class="text-sm text-slate-600 leading-relaxed mb-4">
+                    算法通过求解离散时间代数 Riccati 方程 (DARE)，提取系统矩阵和代价矩阵的内在联系，生成<strong>敏感度矩阵 (Hessian Matrix $P$)</strong>。
+                </p>
+                <div class="bg-slate-50 p-4 rounded text-center text-sm font-mono text-slate-700 border border-slate-200">
+                    b<sub>i</sub> = B<sub>total</sub>/n + 0.5 * log<sub>2</sub> ( P<sub>ii</sub> * &sigma;<sub>i</sub><sup>2</sup> / GeometricMean )
+                </div>
+                <p class="text-xs text-slate-500 mt-3">
+                    该率失真(Rate-Distortion)公式使得通信信道能够根据不同状态变量的“控制关键性”动态分配比特，显著减轻了量化引发的性能退化。
+                </p>
+            </div>
+        </section>
+
+        <!-- SECTION 3: DQN Smart Trigger -->
+        <section id="sec-dqn" class="max-w-5xl mx-auto hidden opacity-0 transition-opacity duration-300">
+            <header class="mb-8">
+                <span class="inline-block px-3 py-1 bg-success/10 text-success rounded-full text-xs font-semibold tracking-wide mb-3">03 / TEMPORAL COMPRESSION</span>
+                <h2 class="text-3xl font-bold text-primary mb-4">基于 DQN 的智能事件触发机制</h2>
+                <p class="text-lg text-slate-600 leading-relaxed">
+                    本模块揭示时间域上的极致压缩。用户将观察到强化学习智能体（DQN）如何学会“语用通信”：打破固定周期发送的死板规则，仅在物理轨迹即将失控的关键时刻触发数据传输。
+                </p>
+            </header>
+
+            <div class="bg-surface rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+                <div class="flex justify-between items-end mb-6 border-b border-slate-100 pb-4">
+                    <div>
+                        <h3 class="text-xl font-bold text-primary">轨迹追踪与通信条形码 (仿真演示)</h3>
+                        <p class="text-sm text-slate-500 mt-1">展示系统状态随时间推移的控制精度及对应的通信时机。</p>
+                    </div>
+                    <div class="hidden sm:block">
+                        <span class="inline-flex items-center gap-1.5 py-1 px-3 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 目标：贴近0轴
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Trajectory Chart -->
+                <div class="mb-6 w-full relative">
+                    <h4 class="text-sm font-bold text-slate-700 mb-2">1. 状态轨迹 (State Trajectory)</h4>
+                    <div class="chart-container">
+                        <canvas id="trajectoryChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Barcode Chart -->
+                <div class="w-full relative pt-4 border-t border-slate-100">
+                    <h4 class="text-sm font-bold text-slate-700 mb-2">2. 通信触发条形码 (Communication Barcode)</h4>
+                    <p class="text-xs text-slate-500 mb-4">竖线代表在该时间步(Time Step)执行了一次数据传输。DQN 智能体学会了在初始偏差大时密集发送，平稳后保持沉默。</p>
+                    <div class="chart-container" style="height: 150px; max-height: 200px;">
+                        <canvas id="barcodeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm text-center">
+                    <div class="text-3xl text-emerald-500 mb-2">&#127919;</div>
+                    <div class="text-sm text-slate-500 mb-1">理想状态 (100%带宽)</div>
+                    <div class="text-lg font-bold text-slate-800">完美基线上限</div>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm text-center">
+                    <div class="text-3xl text-red-500 mb-2">&#128225;</div>
+                    <div class="text-sm text-slate-500 mb-1">周期传输 (死板阈值)</div>
+                    <div class="text-lg font-bold text-slate-800">高频抖动，资源浪费</div>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm text-center ring-2 ring-accent/50">
+                    <div class="text-3xl text-sky-500 mb-2">&#129302;</div>
+                    <div class="text-sm text-slate-500 mb-1">DQN 智能触发</div>
+                    <div class="text-lg font-bold text-slate-800">&lt; 20% 带宽，近乎理想精度</div>
+                </div>
+            </div>
+            
+            <!-- RL Training Insight -->
+            <div class="mt-8 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                <h4 class="font-bold text-slate-800 mb-2">🧠 算法核心：边缘样本挖掘与语用通信</h4>
+                <p class="text-sm text-slate-600 leading-relaxed">
+                    强化学习奖励函数设计为：<code class="bg-white px-1 py-0.5 rounded border border-slate-200 text-slate-800">R = -(追踪误差) - λ * (发送动作 0或1)</code>。通过在训练阶段引入<strong>边缘状态采样 (Hard Negative Mining)</strong>，克服了状态空间不平衡问题，有效防止智能体为了节省带宽而陷入过度保守（导致系统发散）的次优策略。
+                </p>
+            </div>
+        </section>
+
+        <!-- SECTION 4: Future Roadmap -->
+        <section id="sec-future" class="max-w-5xl mx-auto hidden opacity-0 transition-opacity duration-300">
+            <header class="mb-8">
+                <span class="inline-block px-3 py-1 bg-warning/10 text-warning rounded-full text-xs font-semibold tracking-wide mb-3">04 / ROADMAP</span>
+                <h2 class="text-3xl font-bold text-primary mb-4">进阶演进：多智能体带宽博弈与 NMPC</h2>
+                <p class="text-lg text-slate-600 leading-relaxed">
+                    本部分概述项目向更复杂现实场景演进的实施规划。为彻底契合 Topic 6（分布式智能体协调），提出将多智能体强化学习（MARL）与非线性模型预测控制（NMPC）深度结合的高阶方案。
+                </p>
+            </header>
+
+            <div class="relative max-w-3xl mx-auto mt-12 mb-16">
+                <!-- Vertical Line -->
+                <div class="absolute left-4 md:left-1/2 top-0 bottom-0 w-0.5 bg-slate-200 transform md:-translate-x-1/2"></div>
+                
+                <!-- Timeline Item 1 -->
+                <div class="relative flex items-center justify-between md:justify-normal w-full mb-12 flex-col md:flex-row">
+                    <div class="order-1 md:w-5/12 hidden md:block"></div>
+                    <div class="z-10 flex items-center order-1 bg-accent shadow-xl w-8 h-8 rounded-full md:mx-auto absolute left-0 md:relative transform -translate-x-3.5 md:translate-x-0">
+                        <span class="mx-auto font-semibold text-white text-sm">1</span>
+                    </div>
+                    <div class="order-1 bg-white rounded-xl shadow-sm border border-slate-200 w-full md:w-5/12 px-6 py-5 ml-10 md:ml-0">
+                        <h3 class="mb-1 font-bold text-slate-800 text-lg">确立 NMPC 物理上限</h3>
+                        <p class="text-sm leading-snug tracking-wide text-slate-600">使用 PyBullet 与 CasADi 构建非线性多自由度机械臂。NMPC 因具备“预测未来”能力，能更好地容忍粗糙的量化数据，作为高阶控制核心。</p>
+                    </div>
+                </div>
+
+                <!-- Timeline Item 2 -->
+                <div class="relative flex items-center justify-between md:justify-normal w-full mb-12 flex-col md:flex-row-reverse">
+                    <div class="order-1 md:w-5/12 hidden md:block"></div>
+                    <div class="z-10 flex items-center order-1 bg-accent shadow-xl w-8 h-8 rounded-full md:mx-auto absolute left-0 md:relative transform -translate-x-3.5 md:translate-x-0">
+                        <span class="mx-auto font-semibold text-white text-sm">2</span>
+                    </div>
+                    <div class="order-1 bg-white rounded-xl shadow-sm border border-slate-200 w-full md:w-5/12 px-6 py-5 ml-10 md:ml-0">
+                        <h3 class="mb-1 font-bold text-slate-800 text-lg">构建连续动作空间 (MAPPO)</h3>
+                        <p class="text-sm leading-snug tracking-wide text-slate-600">从简单的 DQN (0或1) 升级至 MAPPO。机械臂的每个关节作为一个 Agent，输出连续的带宽优先级请求 $a_i \in (0,1]$。</p>
+                    </div>
+                </div>
+
+                <!-- Timeline Item 3 -->
+                <div class="relative flex items-center justify-between md:justify-normal w-full flex-col md:flex-row">
+                    <div class="order-1 md:w-5/12 hidden md:block"></div>
+                    <div class="z-10 flex items-center order-1 bg-accent shadow-xl w-8 h-8 rounded-full md:mx-auto absolute left-0 md:relative transform -translate-x-3.5 md:translate-x-0">
+                        <span class="mx-auto font-semibold text-white text-sm">3</span>
+                    </div>
+                    <div class="order-1 bg-white rounded-xl shadow-sm border border-slate-200 w-full md:w-5/12 px-6 py-5 ml-10 md:ml-0 border-l-4 border-l-success">
+                        <h3 class="mb-1 font-bold text-slate-800 text-lg">动态带宽博弈机制</h3>
+                        <p class="text-sm leading-snug tracking-wide text-slate-600">基于 Softmax Allocation 将连续动作转化为实际分配比特。所有智能体共享全局 NMPC 惩罚作为 Reward，学会在重力扭矩极大等危险期互相让渡带宽。</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center p-8 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-xl text-white">
+                <div class="text-4xl mb-4">&#128640;</div>
+                <h3 class="text-2xl font-bold mb-3">终极愿景展现</h3>
+                <p class="text-slate-300 max-w-2xl mx-auto text-sm leading-relaxed">
+                    在最终展现中，3D环境内的多个分布式实体将共享极度拥挤的信道。随着系统状态变化，底层通信网络将展现出“呼吸效应”——动态、非均匀且精准的带宽堆叠分配，完美诠释分布式智能体协调中的 JCC 协同设计理念。
+                </p>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="mt-20 pt-6 border-t border-slate-200 text-center text-sm text-slate-400 pb-10">
+            JCC Interactive Report Framework &copy; 2026. Designed for Research Visualization.
+        </footer>
+    </main>
+
+    <!-- JavaScript Logic -->
+    <script>
+        /* --- State Management & Navigation --- */
+        let currentSection = 'overview';
+        
+        // Chart Instances
+        let bitChartInstance = null;
+        let costChartInstance = null;
+        let trajChartInstance = null;
+        let barcodeChartInstance = null;
+
+        function navigate(sectionId) {
+            // Update Navigation UI
+            document.querySelectorAll('nav button').forEach(btn => {
+                btn.classList.remove('nav-active');
+            });
+            const desktopNav = document.getElementById(`nav-${sectionId}`);
+            if(desktopNav) desktopNav.classList.add('nav-active');
+            
+            // Sync mobile select if used from desktop nav
+            const mobileSelect = document.getElementById('mobile-nav');
+            if(mobileSelect.value !== sectionId) mobileSelect.value = sectionId;
+
+            // Hide current, show new with fade
+            const currentEl = document.getElementById(`sec-${currentSection}`);
+            const newEl = document.getElementById(`sec-${sectionId}`);
+            
+            currentEl.classList.remove('opacity-100');
+            currentEl.classList.add('opacity-0');
+            
+            setTimeout(() => {
+                currentEl.classList.add('hidden');
+                newEl.classList.remove('hidden');
+                
+                // Small delay to allow display block to render before triggering opacity transition
+                setTimeout(() => {
+                    newEl.classList.remove('opacity-0');
+                    newEl.classList.add('opacity-100');
+                    
+                    // Render charts if entering specific sections
+                    if(sectionId === 'lqr' && !bitChartInstance) {
+                        initLQRCharts();
+                    } else if (sectionId === 'dqn' && !trajChartInstance) {
+                        initDQNCharts();
+                    }
+                }, 50);
+                
+                currentSection = sectionId;
+                // Scroll to top
+                document.getElementById('main-content').scrollTop = 0;
+            }, 300); // Wait for fade out
+        }
+
+        /* --- LQR Charts Data & Logic --- */
+        const lqrLabels = ['基座关节 (J1)', '肩关节 (J2)', '肘关节 (J3)', '腕关节 (J4)'];
+        const dataUniform = [4, 4, 4, 4];
+        const dataWeighted = [8, 4, 2, 2]; // Base is highly sensitive
+
+        function initLQRCharts() {
+            // 1. Bit Allocation Bar Chart
+            const ctxBit = document.getElementById('bitAllocationChart').getContext('2d');
+            bitChartInstance = new Chart(ctxBit, {
+                type: 'bar',
+                data: {
+                    labels: lqrLabels,
+                    datasets: [{
+                        label: '分配比特数 (Bits)',
+                        data: dataUniform,
+                        backgroundColor: '#94a3b8', // slate-400
+                        borderRadius: 6,
+                        barPercentage: 0.6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 10,
+                            grid: { borderDash: [4, 4] }
+                        },
+                        x: { grid: { display: false } }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) { return context.raw + ' bits'; }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 2. Cost Doughnut Chart
+            const ctxCost = document.getElementById('costComparisonChart').getContext('2d');
+            costChartInstance = new Chart(ctxCost, {
+                type: 'doughnut',
+                data: {
+                    labels: ['传统均匀压缩代价', 'LQR 加权压缩代价'],
+                    datasets: [{
+                        data: [126961, 25837], // Data from prompt context
+                        backgroundColor: ['#ef4444', '#0ea5e9'], // red-500, sky-500
+                        borderWidth: 0,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '65%',
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return ' 代价积分: ' + context.raw.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Trigger initial state
+            updateLQRChart('uniform');
+        }
+
+        function updateLQRChart(mode) {
+            if(!bitChartInstance) return;
+
+            const btnUni = document.getElementById('btn-uniform');
+            const btnWgt = document.getElementById('btn-weighted');
+            const desc = document.getElementById('lqr-chart-desc');
+
+            if (mode === 'uniform') {
+                bitChartInstance.data.datasets[0].data = dataUniform;
+                bitChartInstance.data.datasets[0].backgroundColor = '#94a3b8';
+                btnUni.className = "px-3 py-1 text-xs font-medium rounded-md bg-white shadow-sm text-slate-800";
+                btnWgt.className = "px-3 py-1 text-xs font-medium rounded-md text-slate-500 hover:text-slate-800";
+                desc.innerText = "传统均匀分配将带宽平均分配给所有关节，忽略了底座关节的微小误差会引发巨大的末端偏移。";
+            } else {
+                bitChartInstance.data.datasets[0].data = dataWeighted;
+                bitChartInstance.data.datasets[0].backgroundColor = '#0ea5e9'; // sky-500
+                btnWgt.className = "px-3 py-1 text-xs font-medium rounded-md bg-white shadow-sm text-slate-800";
+                btnUni.className = "px-3 py-1 text-xs font-medium rounded-md text-slate-500 hover:text-slate-800";
+                desc.innerHTML = "<strong>LQR加权分配</strong>基于敏感度矩阵 $P$，自动将带宽倾斜给极端敏感的基座关节，确保系统不失稳。";
+            }
+            bitChartInstance.update();
+        }
+
+        /* --- DQN Charts Data & Logic --- */
+        // Simulated data for 60 steps
+        const timeSteps = Array.from({length: 60}, (_, i) => i);
+        
+        // Simulating physical trajectories approaching 0
+        const trajIdeal = timeSteps.map(t => 5 * Math.exp(-0.1 * t) * Math.cos(0.5 * t) + (Math.random()*0.2-0.1));
+        const trajPeriodic = timeSteps.map((t, i) => {
+            let base = 5 * Math.exp(-0.05 * t) * Math.cos(0.4 * t);
+            // Add severe spikes periodically
+            if(i % 5 === 2 && i < 30) base += (Math.random() > 0.5 ? 2 : -2); 
+            return base + (Math.random()*0.4-0.2);
+        });
+        const trajDQN = timeSteps.map(t => 5 * Math.exp(-0.09 * t) * Math.cos(0.48 * t) + (Math.random()*0.25-0.12));
+
+        // Barcode data (0 = no comm, 1 = comm)
+        const barcodePeriodic = timeSteps.map(t => t % 5 === 0 ? 1 : 0);
+        const barcodeDQN = timeSteps.map(t => {
+            if(t < 5) return 1; // Dense at start (danger zone)
+            if(t > 5 && t < 15 && t%2 === 0) return 1; // Medium
+            if(t >= 15 && Math.random() < 0.1) return 1; // Sparse (stable zone)
+            return 0;
+        });
+
+        function initDQNCharts() {
+            // 1. Trajectory Chart
+            const ctxTraj = document.getElementById('trajectoryChart').getContext('2d');
+            trajChartInstance = new Chart(ctxTraj, {
+                type: 'line',
+                data: {
+                    labels: timeSteps,
+                    datasets: [
+                        {
+                            label: 'Ideal (100% BW)',
+                            data: trajIdeal,
+                            borderColor: '#10b981', // emerald-500
+                            borderDash: [5, 5],
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Periodic Transmit',
+                            data: trajPeriodic,
+                            borderColor: '#ef4444', // red-500
+                            borderWidth: 1.5,
+                            fill: false,
+                            tension: 0.1,
+                            pointRadius: 2
+                        },
+                        {
+                            label: 'DQN Smart Transmit',
+                            data: trajDQN,
+                            borderColor: '#0ea5e9', // sky-500
+                            borderWidth: 2.5,
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#0ea5e9'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { title: { display: true, text: '系统状态偏差' } },
+                        x: { title: { display: true, text: '时间步 (Time Step)' } }
+                    },
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    interaction: { mode: 'nearest', axis: 'x', intersect: false }
+                }
+            });
+
+            // 2. Barcode Chart
+            const ctxBar = document.getElementById('barcodeChart').getContext('2d');
+            barcodeChartInstance = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: timeSteps,
+                    datasets: [
+                        {
+                            label: 'Periodic',
+                            data: barcodePeriodic.map(v => v === 1 ? 0.4 : 0),
+                            backgroundColor: '#ef4444', // red
+                            barPercentage: 0.8,
+                            categoryPercentage: 1.0
+                        },
+                        {
+                            label: 'DQN',
+                            data: barcodeDQN.map(v => v === 1 ? 0.8 : 0),
+                            backgroundColor: '#0ea5e9', // sky
+                            barPercentage: 0.8,
+                            categoryPercentage: 1.0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            max: 1,
+                            display: true,
+                            ticks: {
+                                callback: function(value) {
+                                    if(value === 0.4) return 'Periodic';
+                                    if(value === 0.8) return 'DQN';
+                                    return '';
+                                }
+                            },
+                            grid: { display: false }
+                        },
+                        x: { display: false }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false }
+                    }
+                }
+            });
+        }
+
+        // Initialize first section explicitly just in case (though it starts visible)
+        document.getElementById('sec-overview').classList.remove('hidden');
+    </script>
+</body>
+</html>
