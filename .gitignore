@@ -3,7 +3,7 @@
 *.zip
 Temp/
 *.zip
-.vscode
+.vscode/
 *tensorboard/
 ## Core latex/pdflatex auxiliary files:
 *.aux

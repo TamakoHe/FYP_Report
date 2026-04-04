@@ -1,7 +1,40 @@
 \section{Introduction}
 \subsection{Background and Motivation}
+With the rapid advancement of wireless communication networks and distributed computing architectures, traditional isolated 
+robotic systems are undergoing a profound paradigm shift toward Cloud Robotics and Teleoperation~\cite{intro_cr}. In these modern 
+applications, the intensive computational and decision-making tasks multi-degree-of-freedom (Multi-DOF) robotic manipulators 
+are increasingly offloaded to edge servers or cloud infrastructure. Such systems, where sensors, controllers, and actuators 
+are interconnected via shared communication networks to form a cyber-physical closed loop, are defined as Networked Control 
+Systems (NCS)~\cite{intro_ncs}. NCS endows robotic systems with unprecedented flexibility, scalability, and collaborative computing capabilities,
+significantly reducing the hardware costs and local power consumption of individual robots.
 
+However, incorporating communication networks into physical control loops introduces severe engineering and theoretical challenges. 
+To maintain smooth and precise physical trajectory tracking, high-DOF robotic manipulators (e.g., 6-DOF and above) typically require extremely high-frequency state updates, 
+often exceeding 1000 Hz in sensor sampling rates~\cite{intro_ccc}. In stark contrast, real-world wireless communication channels are subject to strict bandwidth constraints and exhibit highly dynamic, unpredictable behaviors.
+When sensors inject massive volumes of full-precision state data into the network at high frequencies, the limited channel capacity is rapidly exhausted, triggering severe network congestion, packet loss, and unpredictable network-induced delays.
+
+Under extreme network resource constraints, the traditional "Best-Effort" data transmission protocols are fundamentally 
+inadequate for high-precision physical control~\cite{intro_crc}. Deteriorating communication quality directly disrupts the timeliness and integrity of the control feedback loop, causing severe trajectory jittering, control divergence, and ultimately, system failure during delicate manipulation tasks.
+Consequently, the critical challenge in modern Cyber-Physical Systems (CPS) lies in drastically reducing the communication data payload under extreme bandwidth limitations while simultaneously guaranteeing the control stability and tracking precision of the robot.
 \subsection{The Fallacy of Separation and the Need for JCC}
+Historically, the design of networked control systems has been heavily influenced by Shannon’s Separation Principle, which posits that source coding (data compression) and channel coding (error protection) can be designed independently without any loss of optimality. In the context of robotic control, 
+this principle translates into a rigid decoupling between communication protocols and control algorithms~\cite{intro_cucc}. 
+Communication engineers typically design systems to minimize the generic reconstruction error of the transmitted data—often utilizing uniform quantization and periodic transmission mechanisms—while control engineers develop algorithms under the unrealistic assumption of perfect, continuous data reception.
+However, this artificial separation is fundamentally flawed in resource-constrained cyber-physical systems. Treating all sensory data equally blindly ignores the intrinsic "control-criticality" of the physical states.
+In multi-DOF robotic manipulators, minor deviations in specific joints can lead to drastically different physical consequences, rendering uniform compression highly inefficient and prone to causing catastrophic system instability~\cite{intro_rct}.
+
+To overcome the limitations of the separation paradigm, this thesis advocates for a Joint Communication and Control (JCC) framework.
+The core philosophy of JCC is that when communication bandwidth is severely restricted, data transmission and compression algorithms 
+must be explicitly control-oriented and context-aware. Instead of blindly minimizing the mathematical mean square error (MSE) of 
+the data stream, the communication protocol must priority the transmission of information that is most vital to maintaining the stability 
+and tracking precision of the physical plant.
+
+Specifically, this thesis implements the JCC paradigm through two complementary technical approaches. 
+In the temporal domain, the rigid, high-frequency periodic transmission is replaced by an Event-Triggered Control (ETC) mechanism~\cite{intro_etr}. 
+ETC ensures that sensor data is transmitted over the network only when the physical state deviation crosses a predefined safety threshold, effectively eliminating redundant data exchange during stable operational phases.
+In the spatial domain, the proposed framework exploits the mechanical lever effect inherent in robotic manipulators--where
+errors in base joints exponentially magnify end-effector deviations compared to errors in distal joints.  
+By dynamically evaluating the real-time sensitivity of each joint, the system executes non-uniform, weighted bandwidth allocation, stripping communication resources from robust linkages to guarantee the high-precision transmission of critical joint states~\cite{intro_mbe}.
 \subsection{AI-Driven Dynamic Allocation}
 \subsection{Research Objectives and Contributions}
 \subsection{Thesis Organization}
