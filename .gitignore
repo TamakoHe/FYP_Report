@@ -2,6 +2,9 @@
 *Zone.Identifier
 *.zip
 Temp/
+*.zip
+.vscode
+*tensorboard/
 ## Core latex/pdflatex auxiliary files:
 *.aux
 *.lof
