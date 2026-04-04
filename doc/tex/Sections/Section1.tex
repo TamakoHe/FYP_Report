@@ -35,6 +35,43 @@ ETC ensures that sensor data is transmitted over the network only when the physi
 In the spatial domain, the proposed framework exploits the mechanical lever effect inherent in robotic manipulators--where
 errors in base joints exponentially magnify end-effector deviations compared to errors in distal joints.  
 By dynamically evaluating the real-time sensitivity of each joint, the system executes non-uniform, weighted bandwidth allocation, stripping communication resources from robust linkages to guarantee the high-precision transmission of critical joint states~\cite{intro_mbe}.
+\begin{figure}
+    \includegraphics[width=\textwidth]{Figures/intro1}
+    \caption{System Paradigm Comparison between Traditional NCS and Proposed JCC.}
+\end{figure}
 \subsection{AI-Driven Dynamic Allocation}
+While static, control-aware allocation methods—such as those based on Linear Quadratic Regulator (LQR) sensitivity matrices—offer significant improvements over uniform compression, 
+they suffer from inherent limitations. Previous research in NCS has extensively explored static resource allocation and Value-of-Information (VoI) based scheduling to optimize bandwidth usage~\cite{intro_opm}. 
+However, these traditional methodologies largely rely on linearized models and fixed sensitivity weightings. In real-world applications, the dynamics of multi-DOF robotic manipulators are highly nonlinear; 
+the sensitivity of each joint varies dynamically in real-time depending on the robot's current posture, velocity, and external payloads. 
+Consequently, static allocation policies inevitably result in sub-optimal performance during complex, high-speed maneuvers, driving the need for task-oriented or goal-oriented communication frameworks~\cite{intro_todc}.
+
+To overcome the limitations of static models and resolve this complex, nonlinear dynamic resource allocation game, 
+this thesis introduces Deep Reinforcement Learning (DRL) into the communication protocol design. 
+Recently, DRL has demonstrated exceptional capabilities in handling high-dimensional, continuous control and scheduling problems within cyber-physical environments, 
+bridging the gap between optimal control theory and adaptive communication~\cite{intro_drl}. 
+Specifically, this work employs the Proximal Policy Optimization (PPO) algorithm~\cite{intro_ppoa}, 
+which is highly favored for its robust convergence properties, sample efficiency, and stability in continuous action spaces.
+
+Driven by the PPO algorithm, the framework realizes the philosophy of "Pragmatic Communication". Instead of following 
+predefined mathematical rules, the AI agent acts as a centralized bandwidth arbiter. It continuously observes the real-time physical tracking errors and environmental states. 
+By optimizing a reward function strictly tied to the minimization of the overall control cost, the agent organically learns a pragmatic strategy.
+During critical maneuvers, the DRL agent proactively strips communication bandwidth from low-sensitivity linkages and reallocates the strictly limited bit budget to protect highly sensitive base joints. 
+This learning-based dynamic allocation ensures optimal system resilience under extreme network constraints.
 \subsection{Research Objectives and Contributions}
+The primary objective of this thesis is to formulate, implement, and evaluate an intelligent, Deep Reinforcement Learning (DRL)-driven Joint Communication and Control (JCC) framework. 
+This framework aims to guarantee precise and stable trajectory tracking for multi-degree-of-freedom (Multi-DOF) robotic manipulators operating over extreme bottleneck communication channels—specifically under conditions where available bandwidth is severely restricted to less than 10\% of the ideal requirement. 
+By seamlessly integrating temporal event-triggered mechanisms with spatial dynamic bandwidth allocation, this research seeks to resolve the fundamental trade-off between communication efficiency and physical control stability in modern networked cyber-physical systems.
+
+To achieve the aforementioned objectives, the core contributions of this thesis are summarized as follows:
+\begin{enumerate}
+    \item \textbf{Development of a High-Fidelity Cyber-Physical Testbed}: A comprehensive closed-loop control simulation environment was constructed utilizing the PyBullet physics engine. This testbed faithfully replicates realistic kinematic and dynamic constraints of robotic manipulators, providing a robust and reproducible foundation for evaluating networked control algorithms.
+    \item \textbf{Implementation of a Hybrid ETC and LQR-Weighted Benchmark}: A baseline evaluation system was designed by integrating Event-Triggered Control (ETC) in the temporal domain with Linear Quadratic Regulator (LQR)-based static weighted compression in the spatial domain. This benchmark successfully validates the necessity of control-aware, non-uniform data compression over traditional periodic and uniform methods.
+    \item \textbf{Design of a Novel DRL-Driven Context-Aware Allocator}: As the primary innovation, this thesis proposes a dynamic bandwidth allocator powered by the Proximal Policy Optimization (PPO) algorithm. The DRL agent organically learns a "pragmatic communication" strategy by directly observing nonlinear tracking errors and optimizing real-time bandwidth distribution without relying on fixed linear mathematical approximations.
+    \item \textbf{Empirical Validation of Extreme Bandwidth Compression}: Extensive experimental evaluations demonstrate the superiority of the proposed PPO-driven framework. The intelligent agent successfully compressed the communication data payload to under 6\% of the ideal baseline channel capacity, while effectively eliminating trajectory jitter and maintaining near-perfect tracking precision for highly sensitive joints.
+\end{enumerate}
+% TODO: 我要加上物理使用机械臂的部分 所以相关的东西还要改一下 特别是之后的描述的语言！！！！
+% TODO: 审查intro部分的具体数据是否和实验结果吻合
 \subsection{Thesis Organization}
+% TODO: 根据之后的计划补上这一部分，要检查清楚
+
