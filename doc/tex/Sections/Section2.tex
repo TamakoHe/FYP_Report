@@ -11,3 +11,140 @@ Unlike traditional tethered robots with dedicated point-to-point analog connecti
     \item \textbf{Controller and Zero-Order Hold (ZOH)}: The remote controller receives the heavily quantized or delayed state information. A Zero-Order Hold (ZOH) mechanism is implemented at the receiver side to maintain the control input using the most recently received packet when new data is unavailable (due to ETC silence or network loss).
     \item \textbf{Actuators}: The calculated control torques are transmitted back to robot's joints motors to execute the desired trajectory.
 \end{enumerate}
+%% TODO: 加入图表
+%% 这是一个大图 [图 3.1: 联合通信与控制系统 (JCC) 总体信息流架构图] (建议使用全页宽度的流程图，展示数据从真实传感器采集、边缘计算节点执行 ETC 判定与压缩、无线传输到接收端解压、控制电机输出的全过程)。
+\subsubsection{Robotic Manipulator Dynamics and State-Space Modeling}
+To derive control-oridented communication strategies, a rigorous mathematical model of the physical plant is required.
+The continuous-time rigid-body dynamics of an $n$-degree-of-freedom (DOF) robotic manipulator can be described by the following 
+nonlinear second-order differential equation:
+\begin{equation}
+    M(q)\ddot{q} + C(q,\dot{q})\dot{q} + G(q) = \tau
+\end{equation}
+where:
+\begin{itemize}
+    \item $q, \dot{q}, \ddot{q} \in \mathbb{R}^n$ represent the vectors of joint angles, angular velocities, and angular accelerations, respectively.
+    \item $M(q) \in \mathbb{R}^{n \times n}$ is the symmetric, positive-definite inertial matrix.
+    \item $C(q, \dot{q}) \in \mathbb{R}^{n \times n}$ represents the  Coriolis and centrifugal force matrix.
+    \item $G(q) \in \mathbb{R}^n$ is the gravity loading vector.
+    \item $\tau \in \mathbb{R}^n$ is the vector of control torques applied by the actuators.
+\end{itemize}
+To transform this into a standard state-space representation, let the system state vector be defined as $x(t) = [q(t)^T, \dot{q}(t)^T]^T \in \mathbb{R}^{2n}$,
+and the control input as $u(t)=\tau(t)\in\mathbb{R}^n$. The nonlinear dynamics can be rewritten as $u(t) = \tau(t) \in \mathbb{R}^n$.
+The nonlinear dynamics can be rewritten as a first-order ordinary differential equation $\dot{x}(t) = f(x(t), u(t))$:
+\begin{equation}
+    \dot{x}(t) = \frac{d}{dt} \begin{bmatrix} q \\ \dot{q} \end{bmatrix} = \begin{bmatrix} \dot{q} \\ M(q)^{-1}(\tau - C(q,\dot{q})\dot{q} - G(q)) \end{bmatrix}
+\end{equation}
+For advanced linear control methodologies (such as LQR) and sensitivity analysis, this nonlinear model is linearized around a nominal 
+operating trajectory or equilibrium point $(x_e,u_e)$. Using Jacobian linearization, the continuous-time linear time-invariant (LTI) model is obtained:
+\begin{equation}
+    \dot{\tilde{x}}(t) = A_c \tilde{x}(t) + B_c \tilde{u}(t)
+\end{equation}
+where $x_k \in \mathbb{R}^{2n}$ is the discrete state at time step $k$,$u_k \in \mathbb{R}^n$ is the discrete control input, and 
+$w_k \in \mathbb{R}^{2n}$ represents the additive process noise (e.g., modeling inaccuracies and physical disturbances), assumed to be 
+zero-mean Gaussian noise with covariance $W$. The discrete matrices are $A = e^{A_c T_s}$ and $B = \int_{0}^{T_s} e^{A_c t} B_c dt$.
+Physically, matrix $A$ captures the system's inertia and internal state couping, while matrix $B$ maps the applied actuator torques 
+to the resulting state transitions.
+\subsubsection{Bandwidth-Limited Communication Network Model}
+The critical constraint in this thesis is the extreme limitation of the communication channel. Let the network capacity limit be 
+strictly defined as a maximum allowed budget of $B_{total}$ bits per sampling interval $T_s$.
+
+At any discrete time step $k$, if the sensor decides to transmit data, it can not send the ideal 64-bit floating-point representation of 
+$x_k$. Instead, the state vector must be quantized. Let $b_(i,k)$ denote the number of bits allocated to the $i$-th element of the 
+state vector $x_k$. The resource constraint mandates that:
+\begin{equation}
+    \sum_{i=1}^{2n} b_{i,k} \le B_{total}
+\end{equation}
+Let $\mathcal{Q}(\cdot)$ denote the quantization function. The transmitted and subsequently received quantized state 
+is denoted as $x_k^q = \mathcal{Q}(x_k, b_k)$, introducing a quantization error $e_(q,k)=x_k-x_k^q$. If $b_(i,k)=0$, the 
+$i$-th state is entirely discarded during transmission.
+
+Furthermore, to model the temporal aspect the transmission, an indicator variable $\gamma_k\in\{0,1\}$ is introduced,
+where $\gamma_k=1$ indicates a packet is triggered and successfully transmitted, and $\gamma_k=0$ indicates no transmission (event-triggered silence).
+
+At the controller side, a Zero-Order Hold (ZOH) updates the estimated  state $\hat{x_k}$ based on the communication status:
+\begin{equation}
+    \hat{x}_k = 
+    \begin{cases} 
+    x_k^q, & \text{if } \gamma_k = 1 \text{ (Packet received)} \\
+    \hat{x}_{k-1}, & \text{if } \gamma_k = 0 \text{ (No transmission, hold previous state)} 
+    \end{cases}
+\end{equation}
+This can be concisely written as the receiver update equation:
+\begin{equation}
+    \hat{x}_k = \gamma_k x_k^q + (1 - \gamma_k) \hat{x}_{k-1}
+\end{equation}
+The control input $u_k$ is then strictly computed based on this remote estimate $\hat{x_k}$ rather the true physical state $x_k$.
+The central challenge addressed in the following sections is how to simultaneously optimze $\gamma_k$ (when to transmit) and 
+$b_k$ (how to allocate bits) to minimize the deviation between the actual physical trajectory and the desired reference.
+\subsection{Temporal Domain: Event-Triggered Control Mechanism}
+In Networked Control Systems, the temporal strategy of when to transmit data is as critical as the spatial strategy of how to 
+compress it. This section details the deployment of an Event-Triggered Control (ETC) mechanism designed to aggressively truncate 
+redundant transmissions in the temporal domain.
+\subsubsection{The Inefficiency of Traditional Time-Triggered Sampling}
+Traditionally, digital control systems rely on Time-Triggered Control (TTC), where sensor measurements are sampled and transmitted 
+at rigidly fixed, periodic intervals $t_k=k T_s$. While TTC simplifies system design and analysis, it is notoriously inefficient 
+regarding bandwidth utilization.
+
+As rigorously demonstrated by Åström and Bernhardsson~\cite{method_crl}, Lebesgue sampling (event-based) significantly outperforms Riemann sampling (time-based) in stochastic control systems.
+Under a TTC paradigm, the sensor continuously broadcasts data even when the robotic manipulator has reached a stable 
+equilibrium or is executing a steady-state motion with negligible tracking error. In a strictly bandwidth-constrained 
+shared network, shared network, this continuous stream of redundant, non-informative data squanders the limited channel capacity, 
+directly exacerbating network congestion and packet loss for other critical nodes. To achieve "pragmatic communication," the system must abandon periodic transmission and adopt a paradigm of "speaking only when necessary".
+\subsubsection{Design and Derivation of the Event-Triggering Condition}
+The fundamental logic of Event-Triggered Control is to continuously evaluate the "novelty" or "urgency" of the current physical 
+state at the sensor side and initiate a transmission only when the state deviation threatens the system's stability.
+
+Let $\hat{x_k}$ represent the estimated state maintained at the remote controller via the Zero-Order Hold (ZOH). The measurement 
+error (or event error), denoted as $e_k$, is defined as the discrepancy between the actual current state $x_k$ at the sensor 
+and the remote estimate $\hat{x_k}$:
+\begin{equation}
+    e_k = x_k - \hat{x}_k
+\end{equation}
+The triggering condition is governed by a threshold mechanism. A transmission is triggered if and only if the norm of the 
+measurement error exceeds a predefined safety threshold $\delta$:
+\begin{equation}
+    ||e_k||_2 > \delta
+\end{equation}
+\textbf{Mathematical Derivation of Stability}: The viability of this threshold is not arbitrary; it is strictly bounded by Lyapunov stability theory.
+Based on the ETC framework established by Tabuada~\cite{method_etrs}, we must ensure that the control system maintains 
+Asymptotic Stability despite the discontinuous state updates.
+
+Assume there exits a stabliziing state-feedback controller $u_k=-K \hat{x_k}$, and a corresponding discrete-time Control Lyapunov 
+Function $V(x_k)=x_k^T P_L x_k$ (where $P_L$ is a symmetric positive-define matrix). For the closed-loop system to be asymptotically
+stable, the Lyapunov difference must be strictly negative define:
+\begin{equation}
+    \Delta V = V(x_{k+1}) - V(x_k) < 0
+\end{equation}
+By substituting the closed-loop dynamics $x_{k+1}=Ax_k-BK\hat{x_k}=(A-BK)x_k-BKe_k$ into the Lyapunov difference, $\Delta V$ can be 
+bounded by a function of the true state $x_k$ and the measurement error $e_k$. According to Input-to-State Stability (ISS) properties,
+$\Delta V$ takes the form:
+\begin{equation}
+    \Delta V \le -\alpha(||x_k||) + \beta(||e_k||)
+\end{equation}
+where $\alpha(\cdot)$ and $\beta(\cdot)$ are class $\mathcal{K}$ functions. 
+To guarantee $\Delta V < 0$, the error must satisfy $\beta(||e_k||) < \alpha(||x_k||)$. 
+This implies that as long as the measurement error $e_k$ is bounded by a relative threshold (e.g., $||e_k|| \le \sigma ||x_k||$) or a sufficiently small absolute static threshold $\delta$, the stability of the robotic manipulator is mathematically guaranteed.
+
+In our proposed framework, to simplify the edge computation load on the sensor node, a robust absolute static threshold $||e_k||_2>\delta$
+is implemented as the primary transmission trigger.
+\subsubsection{Mathematical Abstraction of Communication Behavior}
+To formally integrate the temporal ETC behavior with the spatial quantization algorithm (discussed in Section 3.3), we introduce 
+a Boolean communication decision variable $\gamma_k\in\{0,1\}$.
+
+The edge sensor node continuously evaluates the ETC condition and generates the decision variable:
+\begin{equation}
+    \gamma_k = 
+    \begin{cases} 
+    1, & \text{if } ||x_k - \hat{x}_{k-1}||_2 > \delta \quad \text{(Trigger Event)} \\
+    0, & \text{otherwise} \quad \text{(Silence)}
+    \end{cases}
+\end{equation}
+Consequently, the mathematical model of the receiver (the Zero-Order Hold at the controller) is perfectly unified. Upon integrating 
+the quantization process $x_k^q = \mathcal{Q}(x_k, b_k)$, the remote state estimate $\hat{x_k}$ is updated according to the following 
+equation.
+\begin{equation}
+    \hat{x}_k = \gamma_k x_k^q + (1 - \gamma_k) \hat{x}_{k-1}
+\end{equation}
+This equation powerfully summarizes the JCC temporal-spatial interplay: If $\gamma_k=1$, the network is actively utilized,
+and the spatial quantizer $\mathcal{Q}(\cdot)$ determines the precision of the payload $x_k^q$. If $\gamma_k=0$, exactly zero bits
+are transmitted over the channel, and the controller relies purely on the historical memory $\hat{x}_{k-1}$, thereby achieving massive bandwidth savings in the temporal domain.
