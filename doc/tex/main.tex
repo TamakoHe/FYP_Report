@@ -27,6 +27,26 @@ parskip, % Uncomment to add space between paragraphs
 \usepackage{amsmath} % Required for bmatrix
 
 
+\usepackage{xcolor}
+\usepackage[most]{tcolorbox}
+
+% 定义浅灰蓝色的背景色（你可以根据喜好微调）
+\definecolor{codebg}{RGB}{240, 242, 246}
+% 定义文字颜色（深灰色显得更柔和）
+\definecolor{codetext}{RGB}{60, 60, 60}
+
+% 使用 tcolorbox 定义一个内联代码块命令 \inlinecode
+\newtcbox{\inlinecode}{
+    on line,                % 确保它和普通文字在同一行
+    boxrule=0pt,            % 边框粗细为 0（即不要边框）
+    colback=codebg,         % 背景颜色
+    colframe=codebg,        % 边框颜色（为了保险起见，和背景色一致）
+    arc=3pt,                % 圆角弧度
+    boxsep=0pt,             % 盒子内部的额外间距设为0
+    left=4pt, right=4pt,    % 左右留白
+    top=3pt, bottom=3pt,    % 上下留白
+    fontupper=\ttfamily\color{codetext} % 内部字体设为等宽字体 (ttfamily) 并应用颜色
+}
 \graphicspath{{Figures/}{./}}
 %----------------------------------------------------------------------------------------
 %	THESIS INFORMATION (NECESSARY)

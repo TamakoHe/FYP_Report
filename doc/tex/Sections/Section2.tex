@@ -148,3 +148,114 @@ equation.
 This equation powerfully summarizes the JCC temporal-spatial interplay: If $\gamma_k=1$, the network is actively utilized,
 and the spatial quantizer $\mathcal{Q}(\cdot)$ determines the precision of the payload $x_k^q$. If $\gamma_k=0$, exactly zero bits
 are transmitted over the channel, and the controller relies purely on the historical memory $\hat{x}_{k-1}$, thereby achieving massive bandwidth savings in the temporal domain.
+\subsubsection{Spatial Domain: Static LQR-Weighted Data Compression}
+While the temporal ETC mechanism dictates when to transmit, the spatial compression mechanism dictates \textit{how} to
+allocate the severely limited bit budget $B_{total}$ across multiple joint states during an active transmission. Traditional 
+approaches uniformly divide the bit budget ($b_i = B_{total} / n$), which blindly treats a 0.1-rad error at the base joint as equivalent
+to a 0.1-rad error at the end-effector.
+
+To overcome this, a static control-aware baseline utilizes the infinite-horizon Linear Quadratic Regulator (LQR) cost function
+$J = \sum (x_k^T Q x_k + u_k^T R u_k)$. By solving the Discrete Algebraic Riccati Equation (DARE), the system extracts the Hessian 
+sensitivity matrix $P$. According to rate-distortion theory, the optimal bit allocation $b_i$ that minimizes the control-oriented 
+distortion is formulated as:
+\begin{equation}
+    b_i = \frac{B_{total}}{n} + \frac{1}{2} \log_2 \left( \frac{P_{ii} \sigma_i^2}{\left( \prod_{j=1}^n P_{jj} \sigma_j^2 \right)^{1/n}} \right)
+\end{equation}
+This static LQR-weighted allocation significantly improves control resilience by permanently stripping bits from low-sensitivity joints and granting them to high-sensitivity joints (e.g., base links). 
+However, in highly nonlinear robotic dynamics, the true sensitivity of a joint is state-dependent and fluctuates drastically based on the manipulator's real-time posture and velocity. 
+To achieve true context-awareness, the system must transition from static mathematical allocation to dynamic, learning-based arbitration.
+\subsection{Deep Reinforcement Learning for Pragmatic Communication}
+The core innovation of this thesis is the formulation of a dynamic, context-aware bandwidth allocator driven by Deep Reinforcement Learning (DRL). 
+Rather than relying on fixed linear approximations (such as the static $P$ matrix), an AI agent is deployed at the edge sensor node to act as a centralized communication arbiter. 
+The agent observes the real-time physical tracking errors and dynamically redistributes the strictly limited $B_{total}$ bits at every time step. 
+This learning-based paradigm epitomizes "Pragmatic Communication"—the communication protocol evolves explicitly to serve the downstream physical task, learning to proactively sacrifice the precision of robust linkages to guarantee the survival of critical joints.
+\subsubsection{Markov Decision Process (MDP) Formulation}
+To enable DRL training, the dynamic bandwidth allocation problem must be strictly formulated as a Markov Decision Process (MDP), 
+defined by the tuple $\langle \mathcal{S}, \mathcal{A}, \mathcal{P}, \mathcal{R}, \gamma \rangle$. \\\\
+\textbf{1. State Space (Observation) $\mathcal{S}$}:
+For the agent to make context-aware decisions, the observation space must encompass sufficient information regarding 
+the current physical urgency of the robotic manipulator. Relying solely on the raw state $x_t$ is insufficient, as the agent 
+would remain ignorant of the control objective. Therefore, the observation $s_t\in\mathcal{S}$ is constructed as an 8-dimensional 
+continuous vector containing the real-time physical states, the target reference states, and the current tracking errors:
+% TODO:我的花体是不是太"花"了
+\begin{equation}
+    s_t = \Big[ q_t^T, \ \dot{q}_t^T, \ q_{target, t}^T, \ (q_t - q_{target, t})^T \Big]^T \in \mathbb{R}^8
+\end{equation}
+This augmented state space allows the neural network to implicitly infer both the current nonlinear posture of the 
+manipulator and the instantaneous tracking deviation, which fundamentally dictate the real-time sensitivity of each joint.\\\\
+\textbf{2. Action Space $\mathcal{A}$ and Discrete Bit Mapping}:
+The primary objective of the agent is to allocate the integer bit budget $B_{total}$ across the $n$ state variables.
+Directly outputting discrete integers via reinforcement learning introduces non-differentiable operations and combinatorial 
+explosion, severely hindering convergence. To resolve this, a continuous action space is adopted, combined with a deterministic 
+Softmax mapping layer.
+
+The DRL agent outputs a continuous action vector $a_t = [a_{1,t}, a_{2,t}, \dots, a_{n,t}]^T \in [-1, 1]^n$. To map these 
+continuous unbounded preferences into a strict constraint $sum_{i=1}^n b_i = B_{total}$ where $b_i \in \mathbb{Z}^+$, 
+the following transformation is applied:
+
+First, the actions are converted into a probability distribution $p_i$ using Softmax function:
+\begin{equation}
+    p_i = \frac{\exp(a_{i,t})}{\sum_{j=1}^n \exp(a_{j,t})}
+\end{equation}
+Next, the probability distribution is scaled by the total bit budget to obtain the floating-point bit allocation:
+\begin{equation}
+    b_{float, i} = p_i \times B_{total}
+\end{equation}
+Finally, the floating-point values are rounded to the nearest integer $b_i=[b_{float},i]$. To strictly enforce the resource 
+constraint due to rounding sequentially assigned to the state variables exhibiting the largest fractional remainder $(b_{float, i} - b_i)$;
+conversely, if the sum is excessive, bits are iteratively deducted from the states holding the maximum allocation. This mapping 
+guarantees that the strict network constraint is never violated while maintaining a smooth gradient landscape for DRL training.\\\\
+\textbf{3. Reward Function Design $\mathcal{R}$}:
+The reward function is the guiding signal that shapes the "pragmatic" intelligence of the agent. Since the 
+bandwidth constraint $B_{total}$ is strictly enforced by the action mapping layer, there is no need to penalize the agent 
+for bandwidth consumption during spatial allocation. Instead, the reward $r_t$ is purely and directly tied to the downstream 
+physical control performance.
+
+At each time step, the instantaneous reward is defined as the negative weighted tracking error (incorporating the LQR $Q$ matrix):
+\begin{equation}
+    r_t = - \left( (x_t - x_{target, t})^T Q (x_t - x_{target, t}) \right)
+\end{equation}
+For a 2-DOF manipulator where base joint is exponentially more critical than the shoulder joint, the $Q$ matrix 
+is highly skewed (e.g., $Q=\text{diag}(1000,1)$). Because the DRL seeks to maximize the cumulative expected reward 
+$\mathbb{E} [\sum \gamma^t r_t]$, it quickly discovers a counter-intuitive but mathematically optimal strategy: it will
+willingly output actions that allocate 0 bits to the shoulder joint (allowing its local error to accumulate), in order 
+to secure maximum bits for the base joint to prevent the massive--1000 penalty multiplier. This mechanism is the mathematical 
+engine behind "Pragmatic Communication". 
+\subsubsection{PPO Algorithm and Policy Network Architecture}
+Given the continuous nature of the action space and requirement for stable monotonic convergence, the Proximal Policy Optimization (PPO)
+algorithm~\cite{method_ppoa} is selected over value-based methods (like DQN) or traditional Policy Gradients (like DDPG). PPO 
+operates under an Actor-Critic architecture, utilizing two separate neural networks:
+\begin{enumerate}
+    \item \textbf{The Actor Network (Policy Function $\pi_\theta(a_t | s_t)$)}: Parameterized by weights $\theta$, this network maps the current state $s_t$ to Gaussian probability distribution over the continuous actions $a_t$, from which the agent samples its allocation decisions.
+    \item \textbf{The Critic Network (Value Function $V_\phi(s_t)$)}: Parameterized by weights $\phi$, this network estimates the expected cumulative discounted reward from state $s_t$, serving as baseline to evaluate the quality of the Actor's actions.
+\end{enumerate}
+Both the Actor and Critic networks are constructed using Multilayer Perceptrons (MLPs). The input layer ingests the 8-dimensional 
+state vector $s_t$. This is followed by two hidden layers, each comprising 128 neurons activated by the ReLU (Rectified Linear Unit) 
+non-linearity, ensuring sufficient representational capacity to capture the highly nonlinear relationship between robotic kinematics 
+and bandwidth sensitivity.
+% TODO: DRL图
+To update the Actor network, PPO defines a clipped surrogate objective function. Left the advantage function $\hat{A}_t = R_t - V_\phi(s_t)$
+represent how much better an action was compared to Critic's expectation. Let $r_t(\theta) = \frac{\pi_\theta(a_t | s_t)}{\pi_{\theta_{old}}(a_t | s_t)}$
+denote the probability ratio between the updated policy and the old policy. The core objective maximized by PPO is:
+\begin{equation}
+    L^{CLIP}(\theta) = \hat{\mathbb{E}}_t \left[ \min \left( r_t(\theta)\hat{A}_t, \ \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t \right) \right]
+\end{equation}
+where $\epsilon$ is a hyperparameter (typically 0.2). The $\text{clip}$ function restricts the policy update step size.
+If a new allocation strategy yields exceptionally high rewards, PPO will not greedily shift the neural network weights 
+too drastically, preventing the policy from collapsing into suboptimal deterministic extremes (e.g., permanently assigning all bits to one joint regardless of the state).
+This trust-region optimization is paramount for training stability in cyber-physical environments, where extreme exploration can lead to immediate system divergence.
+\subsubsection{Training Stability and Hard Negative Mining Strategy}
+Training a DRL agent in a closed-loop control system presents severe challenges regarding state exploration. If the initial 
+DRL agent randomly allocates bits uniformly, the LQR controller might successfully stabilize the robot near the target trajectory.
+In this safe, steady-state region, the errors are negligible, and the rewards $r_t$ approach zero. The agent suffers from a "vanishing signal problem"--
+it learns that \textit{any} bit allocation works fine when robot is safe, and thus fails to learn the critical "survival prioritization"
+required during extreme physical disturbances.
+
+To overcome this, a \textbf{Hard Negative Mining (Edge State Initialization)} strategy is explicitly implemented 
+within the training pipeline. During the \inlinecode{reset()} phase of each training episode, the robotic manipulator is not initialized at the safe origin or along the reference trajectory. 
+Instead, the joints are deliberately spawned at extreme adversarial positions (e.g., $q_1, q_2$ injected with maximum permissible initial deviations).
+
+This adversarial initialization forces the environment to immediately yield catastrophic physical costs (massive negative rewards) 
+at $t=0$. To survive the episode without triggering the safety truncation threshold (which aborts the episode and administers an additional--500 penalty), 
+the PPO agent is forced to rapidly discover the causal link between base-joint tracking errors and system collapse. It effectively 
+"learns under duress", heavily accelerating the convergence towards the optimal pragmatic communication strategy.
