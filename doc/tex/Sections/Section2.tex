@@ -7,16 +7,15 @@ The proposed NCS architecture comprises a closed-loop cyber-physical pipeline en
 Unlike traditional tethered robots with dedicated point-to-point analog connections, the sensory and control data in this modern architecture must traverse a shared, bandwidth-limited communication medium.
 \begin{enumerate}
     \item \textbf{Sensing and Edge Allocation Node}: High-precision encoders continuously monitor the physical states of the manipulator (e.g., joint angles and angular velocities). Instead of transmitting this full-precision data periodically, an edge computing node actsas the "JCC Allocator". It evaluates the necessity of transmission (Temporal ETC) and dynamically assigns limited quantization bits to different state variables (Spatial Allocation).
-    \item \textbf{Bandwidth-Limited Communication Channel}: The network medium is characterized by strict capacity constraints, modeled as a maximum allowable payload of $B_{total}$ bits per sampling interval. This constraint applies universally, representing physical limits in transmission or artificial rate limits in shared wired networks.
-    \item \textbf{Controller and Zero-Order Hold (ZOH)}: The remote controller receives the heavily quantized or delayed state information. A Zero-Order Hold (ZOH) mechanism is implemented at the receiver side to maintain the control input using the most recently received packet when new data is unavailable (due to ETC silence or network loss).
-    \item \textbf{Actuators}: The calculated control torques are transmitted back to robot's joints motors to execute the desired trajectory.
+    \item \textbf{Bandwidth-Limited Communication Channel}: The network medium is characterized by strict capacity constraints, modeled as a maximum allowable payload of $B_{total}$ bits per sampling interval. In our 7-DOF configuration, we investigate an extreme "survival-level" constraint of $B_{total}=14$ bits, imposing an average of merely 1 bit per state variable.
+    \item \textbf{Controller and Zero-Order Hold (ZOH)}: The remote controller receives the heavily quantized or delayed state information. A ZOH mechanism bridges transmission gaps caused by network constraints or ETC silence.
+    \item \textbf{Actuators}: Calculated control torques are transmitted back to the robot's joint motors to execute the desired trajectory.
 \end{enumerate}
 %% TODO: 加入图表
 %% 这是一个大图 [图 3.1: 联合通信与控制系统 (JCC) 总体信息流架构图] (建议使用全页宽度的流程图，展示数据从真实传感器采集、边缘计算节点执行 ETC 判定与压缩、无线传输到接收端解压、控制电机输出的全过程)。
 \subsubsection{Robotic Manipulator Dynamics and State-Space Modeling}
 To derive control-oridented communication strategies, a rigorous mathematical model of the physical plant is required.
-The continuous-time rigid-body dynamics of an $n$-degree-of-freedom (DOF) robotic manipulator can be described by the following 
-nonlinear second-order differential equation:
+The continuous-time rigid-body dynamics of an $n$-degree-of-freedom (DOF) robotic manipulator (where $n = 7$ for our specific Franka Emika configuration) can be described by the following nonlinear second-order differential equation:
 \begin{equation}
     M(q)\ddot{q} + C(q,\dot{q})\dot{q} + G(q) = \tau
 \end{equation}
@@ -35,18 +34,19 @@ The nonlinear dynamics can be rewritten as a first-order ordinary differential e
     \dot{x}(t) = \frac{d}{dt} \begin{bmatrix} q \\ \dot{q} \end{bmatrix} = \begin{bmatrix} \dot{q} \\ M(q)^{-1}(\tau - C(q,\dot{q})\dot{q} - G(q)) \end{bmatrix}
 \end{equation}
 For advanced linear control methodologies (such as LQR) and sensitivity analysis, this nonlinear model is linearized around a nominal 
-operating trajectory or equilibrium point $(x_e,u_e)$. Using Jacobian linearization, the continuous-time linear time-invariant (LTI) model is obtained:
+operating trajectory or equilibrium point $(x_e,u_e)$. Using Jacobian linearization, the continuous-time linear time-invariant (LTI) model is 
+obtained, which is subsequently using a fixed sampling period $T_s$ to yield the discrete-time state-space model:
 \begin{equation}
-    \dot{\tilde{x}}(t) = A_c \tilde{x}(t) + B_c \tilde{u}(t)
+    x_{k+1}=Ax_k+Bu_k+w_k
 \end{equation}
 where $x_k \in \mathbb{R}^{2n}$ is the discrete state at time step $k$,$u_k \in \mathbb{R}^n$ is the discrete control input, and 
 $w_k \in \mathbb{R}^{2n}$ represents the additive process noise (e.g., modeling inaccuracies and physical disturbances), assumed to be 
-zero-mean Gaussian noise with covariance $W$. The discrete matrices are $A = e^{A_c T_s}$ and $B = \int_{0}^{T_s} e^{A_c t} B_c dt$.
+zero-mean Gaussian noise with covariance $W$.
 Physically, matrix $A$ captures the system's inertia and internal state couping, while matrix $B$ maps the applied actuator torques 
 to the resulting state transitions.
 \subsubsection{Bandwidth-Limited Communication Network Model}
 The critical constraint in this thesis is the extreme limitation of the communication channel. Let the network capacity limit be 
-strictly defined as a maximum allowed budget of $B_{total}$ bits per sampling interval $T_s$.
+strictly defined as a maximum allowed budget of $B_{total}$ bits per sampling interval $T_s$. 
 
 At any discrete time step $k$, if the sensor decides to transmit data, it can not send the ideal 64-bit floating-point representation of 
 $x_k$. Instead, the state vector must be quantized. Let $b_(i,k)$ denote the number of bits allocated to the $i$-th element of the 
@@ -164,98 +164,80 @@ distortion is formulated as:
 This static LQR-weighted allocation significantly improves control resilience by permanently stripping bits from low-sensitivity joints and granting them to high-sensitivity joints (e.g., base links). 
 However, in highly nonlinear robotic dynamics, the true sensitivity of a joint is state-dependent and fluctuates drastically based on the manipulator's real-time posture and velocity. 
 To achieve true context-awareness, the system must transition from static mathematical allocation to dynamic, learning-based arbitration.
+
 \subsection{Deep Reinforcement Learning for Pragmatic Communication}
-The core innovation of this thesis is the formulation of a dynamic, context-aware bandwidth allocator driven by Deep Reinforcement Learning (DRL). 
-Rather than relying on fixed linear approximations (such as the static $P$ matrix), an AI agent is deployed at the edge sensor node to act as a centralized communication arbiter. 
-The agent observes the real-time physical tracking errors and dynamically redistributes the strictly limited $B_{total}$ bits at every time step. 
-This learning-based paradigm epitomizes "Pragmatic Communication"—the communication protocol evolves explicitly to serve the downstream physical task, learning to proactively sacrifice the precision of robust linkages to guarantee the survival of critical joints.
 \subsubsection{Markov Decision Process (MDP) Formulation}
 To enable DRL training, the dynamic bandwidth allocation problem must be strictly formulated as a Markov Decision Process (MDP), 
-defined by the tuple $\langle \mathcal{S}, \mathcal{A}, \mathcal{P}, \mathcal{R}, \gamma \rangle$. \\\\
-\textbf{1. State Space (Observation) $\mathcal{S}$}:
+defined by the tuple $\langle \mathcal{S}, \mathcal{A}, \mathcal{P}, \mathcal{R}, \gamma \rangle$.
+
+\noindent\textbf{1. State Space (Observation) $\mathcal{S}$}:\\
 For the agent to make context-aware decisions, the observation space must encompass sufficient information regarding 
 the current physical urgency of the robotic manipulator. Relying solely on the raw state $x_t$ is insufficient, as the agent 
-would remain ignorant of the control objective. Therefore, the observation $s_t\in\mathcal{S}$ is constructed as an 8-dimensional 
+would remain ignorant of the control objective. Therefore, the observation $s_t\in\mathcal{S}$ is constructed as a 28-dimensional 
 continuous vector containing the real-time physical states, the target reference states, and the current tracking errors:
-% TODO:我的花体是不是太"花"了
 \begin{equation}
-    s_t = \Big[ q_t^T, \ \dot{q}_t^T, \ q_{target, t}^T, \ (q_t - q_{target, t})^T \Big]^T \in \mathbb{R}^8
+    s_t = \Big[ q_t^T, \ \dot{q}_t^T, \ q_{target, t}^T, \ (q_t - q_{target, t})^T \Big]^T \in \mathbb{R}^{28}
 \end{equation}
 This augmented state space allows the neural network to implicitly infer both the current nonlinear posture of the 
-manipulator and the instantaneous tracking deviation, which fundamentally dictate the real-time sensitivity of each joint.\\\\
-\textbf{2. Action Space $\mathcal{A}$ and Discrete Bit Mapping}:
-The primary objective of the agent is to allocate the integer bit budget $B_{total}$ across the $n$ state variables.
-Directly outputting discrete integers via reinforcement learning introduces non-differentiable operations and combinatorial 
-explosion, severely hindering convergence. To resolve this, a continuous action space is adopted, combined with a deterministic 
-Softmax mapping layer.
+manipulator and the instantaneous tracking deviation, which fundamentally dictate the real-time sensitivity of each joint.
 
-The DRL agent outputs a continuous action vector $a_t = [a_{1,t}, a_{2,t}, \dots, a_{n,t}]^T \in [-1, 1]^n$. To map these 
-continuous unbounded preferences into a strict constraint $sum_{i=1}^n b_i = B_{total}$ where $b_i \in \mathbb{Z}^+$, 
-the following transformation is applied:
+\vspace{0.5em}
+\noindent\textbf{2. Action Space $\mathcal{A}$ and Discrete Bit Mapping}:\\
+The output of the policy network is a continuous action vector $a_t \in [-1, 1]^7$, representing the relative allocation "willingness" for each joint. Since physical network constraints require discrete integer bit allocations $b_t \in \mathbb{Z}^7$ such that $\sum b_{i,t} = B_{total}$, a deterministic mapping layer is introduced. First, the continuous logits are transformed into normalized probabilities via a Softmax function:
+\begin{equation}
+    w_i = \frac{\exp(a_{i,t})}{\sum_{j=1}^7 \exp(a_{j,t})}
+\end{equation}
+To guarantee system stability, each joint is assigned a mandatory minimum bandwidth (e.g., $b_{min}=1$). The remaining bits are distributed proportionally:
+\begin{equation}
+    b_{float, i} = b_{min} + w_i \times (B_{total} - 7 \times b_{min})
+\end{equation}
+Finally, the floating-point values are rounded to the nearest integer $b_i=\lfloor b_{float, i} \rfloor$. To strictly enforce the resource constraint, any residual bits due to rounding are sequentially assigned to the state variables exhibiting the largest fractional remainder $(b_{float, i} - b_i)$; conversely, if the sum is excessive, bits are iteratively deducted from the states holding the maximum allocation. This mapping guarantees that the strict network constraint is never violated while maintaining a smooth gradient landscape for DRL training.
 
-First, the actions are converted into a probability distribution $p_i$ using Softmax function:
-\begin{equation}
-    p_i = \frac{\exp(a_{i,t})}{\sum_{j=1}^n \exp(a_{j,t})}
-\end{equation}
-Next, the probability distribution is scaled by the total bit budget to obtain the floating-point bit allocation:
-\begin{equation}
-    b_{float, i} = p_i \times B_{total}
-\end{equation}
-Finally, the floating-point values are rounded to the nearest integer $b_i=[b_{float},i]$. To strictly enforce the resource 
-constraint due to rounding sequentially assigned to the state variables exhibiting the largest fractional remainder $(b_{float, i} - b_i)$;
-conversely, if the sum is excessive, bits are iteratively deducted from the states holding the maximum allocation. This mapping 
-guarantees that the strict network constraint is never violated while maintaining a smooth gradient landscape for DRL training.\\\\
-\textbf{3. Reward Function Design $\mathcal{R}$}:
+\vspace{0.5em}
+\noindent\textbf{3. Reward Function Design $\mathcal{R}$}:\\
 The reward function is the guiding signal that shapes the "pragmatic" intelligence of the agent. Since the 
 bandwidth constraint $B_{total}$ is strictly enforced by the action mapping layer, there is no need to penalize the agent 
 for bandwidth consumption during spatial allocation. Instead, the reward $r_t$ is purely and directly tied to the downstream 
 physical control performance.
 
-At each time step, the instantaneous reward is defined as the negative weighted tracking error (incorporating the LQR $Q$ matrix):
+To ensure the DRL agent optimizes for true physical accuracy rather than abstract mathematical approximations, the reward function abandons the standard LQR quadratic cost in favor of a physics-informed \textbf{Reward Shaping} mechanism. At each time step, the system utilizes Forward Kinematics (FK) to compute the actual 3D Euclidean distance error at the end-effector. The instantaneous reward $r_t$ is defined as the relative physical improvement of the DRL's allocation ($E_{RL}$) over the static LQR baseline's allocation ($E_{static}$):
 \begin{equation}
-    r_t = - \left( (x_t - x_{target, t})^T Q (x_t - x_{target, t}) \right)
+    r_t = \left( E_{static} - E_{RL} \right) \times 1000
 \end{equation}
-For a 2-DOF manipulator where base joint is exponentially more critical than the shoulder joint, the $Q$ matrix 
-is highly skewed (e.g., $Q=\text{diag}(1000,1)$). Because the DRL seeks to maximize the cumulative expected reward 
-$\mathbb{E} [\sum \gamma^t r_t]$, it quickly discovers a counter-intuitive but mathematically optimal strategy: it will
-willingly output actions that allocate 0 bits to the shoulder joint (allowing its local error to accumulate), in order 
-to secure maximum bits for the base joint to prevent the massive--1000 penalty multiplier. This mechanism is the mathematical 
-engine behind "Pragmatic Communication". 
+where $E = || \text{FK}(q_{target}) - \text{FK}(\mathcal{Q}(q_{target}, b)) ||_2$ represents the spatial deviation in meters.
+
+By structuring the reward as a comparative advantage rather than an absolute negative error, the agent is granted a clear, non-sparse gradient signal: it is penalized if it performs worse than the baseline and highly rewarded for outperforming it. This "learning by comparison" mechanism forces the agent to overcome the limitations of the linear static assumption and discover nonlinear, pragmatic bit-squeezing strategies that rigid mathematical formulas fail to capture.
+
 \subsubsection{PPO Algorithm and Policy Network Architecture}
 Given the continuous nature of the action space and requirement for stable monotonic convergence, the Proximal Policy Optimization (PPO)
-algorithm~\cite{method_ppoa} is selected over value-based methods (like DQN) or traditional Policy Gradients (like DDPG). PPO 
+algorithm is selected over value-based methods (like DQN) or traditional Policy Gradients (like DDPG). PPO 
 operates under an Actor-Critic architecture, utilizing two separate neural networks:
 \begin{enumerate}
     \item \textbf{The Actor Network (Policy Function $\pi_\theta(a_t | s_t)$)}: Parameterized by weights $\theta$, this network maps the current state $s_t$ to Gaussian probability distribution over the continuous actions $a_t$, from which the agent samples its allocation decisions.
     \item \textbf{The Critic Network (Value Function $V_\phi(s_t)$)}: Parameterized by weights $\phi$, this network estimates the expected cumulative discounted reward from state $s_t$, serving as baseline to evaluate the quality of the Actor's actions.
 \end{enumerate}
-Both the Actor and Critic networks are constructed using Multilayer Perceptrons (MLPs). The input layer ingests the 8-dimensional 
+Both the Actor and Critic networks are constructed using Multilayer Perceptrons (MLPs). The input layer ingests the 28-dimensional 
 state vector $s_t$. This is followed by two hidden layers, each comprising 128 neurons activated by the ReLU (Rectified Linear Unit) 
 non-linearity, ensuring sufficient representational capacity to capture the highly nonlinear relationship between robotic kinematics 
 and bandwidth sensitivity.
-% TODO: DRL图
-To update the Actor network, PPO defines a clipped surrogate objective function. Left the advantage function $\hat{A}_t = R_t - V_\phi(s_t)$
-represent how much better an action was compared to Critic's expectation. Let $r_t(\theta) = \frac{\pi_\theta(a_t | s_t)}{\pi_{\theta_{old}}(a_t | s_t)}$
-denote the probability ratio between the updated policy and the old policy. The core objective maximized by PPO is:
+
+Furthermore, given the substantial computational overhead introduced by real-time Forward Kinematics calculations during training, the environment is vectorized across multiple CPU cores utilizing a \inlinecode{SubprocVecEnv} architecture. This multiprocessing paradigm allocates independent physics engine instances to each core, enabling the agent to explore hundreds of thousands of complex physical interactions in parallel. This significantly accelerates convergence while preventing state-space overfitting.
+
+To update the Actor network, PPO defines a clipped surrogate objective function. Let the advantage function $\hat{A}_t = R_t - V_\phi(s_t)$ represent the relative value of an action. The policy is updated by maximizing:
 \begin{equation}
-    L^{CLIP}(\theta) = \hat{\mathbb{E}}_t \left[ \min \left( r_t(\theta)\hat{A}_t, \ \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t \right) \right]
+    L^{CLIP}(\theta) = \mathbb{E}_t \left[ \min\left( r_t(\theta)\hat{A}_t, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t \right) \right]
 \end{equation}
-where $\epsilon$ is a hyperparameter (typically 0.2). The $\text{clip}$ function restricts the policy update step size.
-If a new allocation strategy yields exceptionally high rewards, PPO will not greedily shift the neural network weights 
-too drastically, preventing the policy from collapsing into suboptimal deterministic extremes (e.g., permanently assigning all bits to one joint regardless of the state).
-This trust-region optimization is paramount for training stability in cyber-physical environments, where extreme exploration can lead to immediate system divergence.
-\subsubsection{Training Stability and Hard Negative Mining Strategy}
-Training a DRL agent in a closed-loop control system presents severe challenges regarding state exploration. If the initial 
-DRL agent randomly allocates bits uniformly, the LQR controller might successfully stabilize the robot near the target trajectory.
-In this safe, steady-state region, the errors are negligible, and the rewards $r_t$ approach zero. The agent suffers from a "vanishing signal problem"--
-it learns that \textit{any} bit allocation works fine when robot is safe, and thus fails to learn the critical "survival prioritization"
-required during extreme physical disturbances.
+where $r_t(\theta) = \frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{old}}(a_t|s_t)}$ is the probability ratio, and $\epsilon$ is a clipping hyperparameter.
+
+\subsubsection{Hard Negative Mining and Adversarial Initialization}
+If the initial DRL agent randomly allocates bits uniformly, the LQR controller might successfully stabilize the robot near the target trajectory.
+In this safe, steady-state region, the errors are negligible, and the rewards $r_t$ approach zero. The agent suffers from a "vanishing signal problem"---it learns that \textit{any} bit allocation works fine when robot is safe, and thus fails to learn the critical "survival prioritization" required during extreme physical disturbances.
 
 To overcome this, a \textbf{Hard Negative Mining (Edge State Initialization)} strategy is explicitly implemented 
 within the training pipeline. During the \inlinecode{reset()} phase of each training episode, the robotic manipulator is not initialized at the safe origin or along the reference trajectory. 
 Instead, the joints are deliberately spawned at extreme adversarial positions (e.g., $q_1, q_2$ injected with maximum permissible initial deviations).
 
 This adversarial initialization forces the environment to immediately yield catastrophic physical costs (massive negative rewards) 
-at $t=0$. To survive the episode without triggering the safety truncation threshold (which aborts the episode and administers an additional--500 penalty), 
+at $t=0$. To survive the episode without triggering the safety truncation threshold (which aborts the episode and administers an additional penalty), 
 the PPO agent is forced to rapidly discover the causal link between base-joint tracking errors and system collapse. It effectively 
 "learns under duress", heavily accelerating the convergence towards the optimal pragmatic communication strategy.

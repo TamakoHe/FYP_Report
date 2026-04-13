@@ -1,7 +1,20 @@
-\section{Discussion}
+\section{Experiments and Results}
+\subsection{Experimental Setup and Implementation Details}
+To comprehensively evaluate the performance, robustness, and real-world applicability of the proposed Joint Communication and Control (JCC)
+architecture, a rigorous two-stage validation methodology was designed. This methodology encompasses both high-fidelity software 
+simulations and physical hardware deployments. This section outlines the precise configuration of the simulation environment,
+the DRL training pipeline, and the real-world robotic setup, ensuring the complete reproducibility of the experiments presented in this study.
+\subsubsection{Simulation Environment Configuration (PyBullet)}
+The primary testbed for training the reinforcement learning agent and validating the extreme bandwidth constraints was constructed 
+using the PyBullet engine (Version 3.25). PyBullet was selected due to its highly optimized rigid-body dynamics, accurate 
+collision detection algorithms, and robust support for simulating complex robotic manipulators.
+\noindent\textbf{1. Physics Engine and Kinematic Settings}: The target object within the simulation is a highly 
+accurate Unified Robot Description Format (URDF) model of the 7-Degree-of-Freedom (DOF) Franka Emika Panda robotic manipulator.
+To accurately capture the non-linear physical dynamics, inertial effects, and transient tracking errors, the physics engine was configured 
+with the following parameters:
+\begin{itemize}
+    \item \textbf{Control and Integration Step}: The engine operates with a base controls frequency of 240 Hz (a step size of $\frac{1}{240}$ seconds). This high-frequency loop closely mirrors the real-time operational standard of modern industrial controllers.
+    \item \textbf{Gravitational Acceleration}: The environmental gravity vector was set to standard Earth gravity $[0,0,-9.81]\;m/s^2$, forcing the allocation algorithms to actively compensate for gravity-induced steady-state errors, particularly at the base and shoulder joints.
+    \item \textbf{Solver Parameters}: The inverse kinematics (IK) solver was configured with a maximum of 100 iterations and residual threshold of $1\times10^{-5}$ to ensure that the target reference states ($q_{target}$) provided to the allocation algorithms are geometrically flawless.
+\end{itemize}
 
-The discussion is your opportunity to impress an expert with your depth of understanding. Don't worry so much about the non-expert reader -- she or he can skip to the Conclusions.
-
-For a research project this section should provide a logical argument leading from the experimental observations to the final conclusions. Evaluate your results thoroughly and gain every possible piece of understanding from them. Compare the results in detail to other work in the field. This should be a \emph{critical} comparison so don't just say that your results are different from previous work; explain \emph{why}. Never say `The results were as expected' unless you have already described exactly what was expected!
-
-The main purpose of the Discussion in a design-and-build project is to assess the performance of your product against the specification, showing its strengths and weaknesses.
