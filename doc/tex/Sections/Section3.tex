@@ -33,21 +33,23 @@ an Actor-Critic framework. The policy and value networks were constructed using 
 of 128 neurons each, activated by ReLU functions. The training process spanned 100,000 time steps to ensure complete convergence 
 under hard physical feedback. The critical hyper parameters, tuned through iterative heuristic experimentation, are detailed in Table \ref{tab:para}.
 \begin{table}[H]
-\begin{tabular}{|l|l|l|}
-\hline
-Hyperparameter                      & Value & Description                                              \\ \hline
-\textbf{Algorithm Framework}        & PPO   & Actor-Critic architecture for continuous action spaces.  \\ \hline
-\textbf{Network Architecture}     & MLP {[}128, 128{]} & Two hidden layers with 128 nodes for both Actor and Critic.     \\ \hline
-\textbf{Total Timesteps}          & 100,000            & Sufficient for hard-negative mining and physical stabilization. \\ \hline
-\textbf{Learning Rate ($\alpha$)} & $3 \times 10^{-4}$ & Constant learning rate for stable gradient descent.             \\ \hline
-\textbf{Discount Factor ($\gamma$)} & 0.99  & High emphasis on long-term reward maximization.          \\ \hline
-\textbf{Batch Size}                 & 64    & Number of experiences used for a single gradient update. \\ \hline
-\textbf{Steps per Environment}      & 512   & Rollout buffer size before updating the policy.          \\ \hline
-\textbf{Clip Range ($\epsilon$)}    & 0.2   & Prevents destructively large policy updates.             \\ \hline
-\textbf{Entropy Coefficient}        & 0.01  & Encourages initial exploration of extreme allocations.   \\ \hline
-\end{tabular}
-\caption{PPO Training Hyperparameters for JCC Bandwidth Allocation}
-\label{tab:para}
+    \centering
+    \small
+    \begin{tabular}{|l|l|l|}
+        \hline
+        Hyperparameter                      & Value & Description                                              \\ \hline
+        \textbf{Algorithm Framework}        & PPO   & Actor-Critic architecture for continuous action spaces.  \\ \hline
+        \textbf{Network Architecture}     & MLP {[}128, 128{]} & Two hidden layers with 128 nodes for both Actor and Critic.     \\ \hline
+        \textbf{Total Timesteps}          & 100,000            & Sufficient for hard-negative mining and physical stabilization. \\ \hline
+        \textbf{Learning Rate ($\alpha$)} & $3 \times 10^{-4}$ & Constant learning rate for stable gradient descent.             \\ \hline
+        \textbf{Discount Factor ($\gamma$)} & 0.99  & High emphasis on long-term reward maximization.          \\ \hline
+        \textbf{Batch Size}                 & 64    & Number of experiences used for a single gradient update. \\ \hline
+        \textbf{Steps per Environment}      & 512   & Rollout buffer size before updating the policy.          \\ \hline
+        \textbf{Clip Range ($\epsilon$)}    & 0.2   & Prevents destructively large policy updates.             \\ \hline
+        \textbf{Entropy Coefficient}        & 0.01  & Encourages initial exploration of extreme allocations.   \\ \hline
+    \end{tabular}
+    \caption{PPO Training Hyperparameters for JCC Bandwidth Allocation}
+    \label{tab:para}
 \end{table}
 \subsubsection{Real-World Hardware Setup (Franka Emika Panda)}
 % TODO: 这个部分要在实验中写
@@ -62,3 +64,40 @@ To rigorously isolate the policy improvement from they environment stochasticity
 Mining strategies, a standardized evaluation protocol was implemented. During the 100,000-timestep training process, the agent's 
 policy was temporarily frozen every 5,000 steps to execute a fixed, predefined evaluation trajectory (Hover$\rightarrow$Grasp$\rightarrow$Hover) 
 in a deterministic, headless physical environment.
+\begin{figure}[H]
+    \centering
+    \includegraphics{Figures/Figure_1.png}
+    \caption{Convergence curve of the PPO agent's end-effector tracking error (evaluated on a standard trajectory) over 25 evaluation intervals. 
+    The curve illustrates the agent's transition from initial random exploration, through transient trust-region oscillations, to the successful discovery of pragmatic bandwidth allocation strategies.}
+    \label{fig:conv}
+\end{figure}
+As vividly captured Fig \ref{fig:conv}, the training convergence process is not a simplistic monotonic decline but dynamically 
+reflects the agent's complex learning behavior, which can be dissected into four distinct phases:
+
+\noindent\textbf{1. Initial Plateau and Blind Exploration Phase (Evaluations 0 to 5)}: In the initial stages of training, the Actor 
+network's weights are randomly initialized, leading to stochastic bandwidth allocation across the 7-DOF joints. Because the agent 
+has not yet learned the "lever effect" of the manipulator, it experiences massive trajectory deviations, forming a rigid performance 
+plateau at roughly \textbf{581 mm}. This phase perfectly validates the necessity of the Hard Negative Mining strategy; the environment 
+yields consistent, unyielding penalties, coercing the agent to desperately search for a viable gradient out of the sub-optimal uniform 
+allocation trap.
+
+\noindent\textbf{2. Rapid Descent and "Pragmatic" Discovery Phase (Evaluations 5 to 10)}: Following the initial exploratory penalty, the curve exhibits a 
+steep, sharp descent, with the error dropping rapidly from 581 mm to approximately \textbf{505 mm}. Driven by the physics-informed 
+Reward Shaping mechanism, the PPO agent achieves a critical policy breakthrough. It discovers the fundamental principle of Pragmatic 
+Communication: the optimal strategy is to proactively strip bit from robust, distal joints (such as the wrist) and unconditionally secure 
+high-precision transmission for the critical base and shoulder joints.
+
+\noindent\textbf{3. Transient Rebound and Trust-Region Oscillation (Evaluation 10 to 14)}: Intersetingly, the learning curve not remain perfectly 
+stable after the initial drop. Between evaluations 10 and 14, a visible rebound occurs, pushing the error temporarily back up a local peak of 
+\textbf{547 mm}. This behavior is classic characteristic of PPO's trust-region updates intersecting with highly non-linear physical constraints.
+As the agent aggressively pushes the "pragmatic" limits--perhaps attempting to strip too many bits from the wrist joints to further 
+optimize the base--it encounters severe physical instability. The clipping mechanism of PPO proves vital here preventing the policy from collapsing 
+entirely during this over-exploratory phase.
+
+\noindent\textbf{4. Steady-State Convergence and Fine-Tuning (Evaluations 15 to 24)}: After recovering from the transient rebound, 
+the agent actively corrects its over-aggressive allocation strategy. The curve resumes its descent and finally stabilizes below 500 mm, 
+reaching a convergence asymptoe of approximately \textbf{485 mm}. This final smooth convergence is heavily supported by the linear learning 
+rate scheduling and reward exploitation, securely "locking in" the learned pragmatic allocation policy.
+
+Ultimately, the successful convergence of the PPO agent verifies that an artificial intelligence model can organically internalize 
+complex mechanical kinematics and non-linear sensitivity profiles, laying a robust foundation for the subsequent extreme bandwidth tracking experiments.
