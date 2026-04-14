@@ -8,6 +8,7 @@ the DRL training pipeline, and the real-world robotic setup, ensuring the comple
 The primary testbed for training the reinforcement learning agent and validating the extreme bandwidth constraints was constructed 
 using the PyBullet engine (Version 3.25). PyBullet was selected due to its highly optimized rigid-body dynamics, accurate 
 collision detection algorithms, and robust support for simulating complex robotic manipulators.
+
 \noindent\textbf{1. Physics Engine and Kinematic Settings}: The target object within the simulation is a highly 
 accurate Unified Robot Description Format (URDF) model of the 7-Degree-of-Freedom (DOF) Franka Emika Panda robotic manipulator.
 To accurately capture the non-linear physical dynamics, inertial effects, and transient tracking errors, the physics engine was configured 
@@ -17,4 +18,47 @@ with the following parameters:
     \item \textbf{Gravitational Acceleration}: The environmental gravity vector was set to standard Earth gravity $[0,0,-9.81]\;m/s^2$, forcing the allocation algorithms to actively compensate for gravity-induced steady-state errors, particularly at the base and shoulder joints.
     \item \textbf{Solver Parameters}: The inverse kinematics (IK) solver was configured with a maximum of 100 iterations and residual threshold of $1\times10^{-5}$ to ensure that the target reference states ($q_{target}$) provided to the allocation algorithms are geometrically flawless.
 \end{itemize}
+\noindent\textbf{2. Multiprocessing Vectorized Architecture}: During the development of the physics-informed Reward Shaping mechanism,
+it was observed that computing the real-time Forward Kinematics (FK) and 3D Euclidean distances at every step introduced a severe 
+computational bottleneck. Operating on a single CPU core severely restricted the the agent's exploration capacity.
 
+To overcome this, a multiprocessing vectorized architecture was implemented using the \inlinecode{SubprocVecEnv} wrapper from 
+the \inlinecode{stable-baseline3} library. The training environment was parallelized across 10 independent, headless (non-GUI) PyBullet
+physics servers running on an [Apple M4] processor. This architecture allows the agent to explore hundreds of thousands of complex physical 
+interactions simultaneously, accelerating the convergence speed by nearly an order of magnitude while preventing the model from overfitting to a single state 
+trajectory.
+
+\noindent\textbf{3. DRL Agent Hyperparameters}: The intelligent bit-allocation agent was trained utilizing the Proximal Policy Optimization (PPO) algorithm under 
+an Actor-Critic framework. The policy and value networks were constructed using Multilayer Perceptions (MLP) with two hidden layers
+of 128 neurons each, activated by ReLU functions. The training process spanned 100,000 time steps to ensure complete convergence 
+under hard physical feedback. The critical hyper parameters, tuned through iterative heuristic experimentation, are detailed in Table \ref{tab:para}.
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Hyperparameter                      & Value & Description                                              \\ \hline
+\textbf{Algorithm Framework}        & PPO   & Actor-Critic architecture for continuous action spaces.  \\ \hline
+\textbf{Network Architecture}     & MLP {[}128, 128{]} & Two hidden layers with 128 nodes for both Actor and Critic.     \\ \hline
+\textbf{Total Timesteps}          & 100,000            & Sufficient for hard-negative mining and physical stabilization. \\ \hline
+\textbf{Learning Rate ($\alpha$)} & $3 \times 10^{-4}$ & Constant learning rate for stable gradient descent.             \\ \hline
+\textbf{Discount Factor ($\gamma$)} & 0.99  & High emphasis on long-term reward maximization.          \\ \hline
+\textbf{Batch Size}                 & 64    & Number of experiences used for a single gradient update. \\ \hline
+\textbf{Steps per Environment}      & 512   & Rollout buffer size before updating the policy.          \\ \hline
+\textbf{Clip Range ($\epsilon$)}    & 0.2   & Prevents destructively large policy updates.             \\ \hline
+\textbf{Entropy Coefficient}        & 0.01  & Encourages initial exploration of extreme allocations.   \\ \hline
+\end{tabular}
+\caption{PPO Training Hyperparameters for JCC Bandwidth Allocation}
+\label{tab:para}
+\end{table}
+\subsubsection{Real-World Hardware Setup (Franka Emika Panda)}
+% TODO: 这个部分要在实验中写
+\subsection{Simulation Results: Unlocking Extreme Bandwidth Limits}
+\subsubsection{Training Convergence and Reward Analysis (Experiment 1)}
+Before evaluating the final tracking performance of the robotic manipulator, it is imperative to analyze the training dynamics 
+and convergence behavior of the PPO agent. Training a DRL agent within a highly non-linear, rigid-body physics environment presents 
+significant challenges, particularly due to the discontinuous nature of extreme bit quantization (e.g., 1-bit or 2-bit allocations) 
+and the resulting high-variance physical feedback.
+
+To rigorously isolate the policy improvement from they environment stochasticity introduced by the Domain Randomization and Hard Negative 
+Mining strategies, a standardized evaluation protocol was implemented. During the 100,000-timestep training process, the agent's 
+policy was temporarily frozen every 5,000 steps to execute a fixed, predefined evaluation trajectory (Hover$\rightarrow$Grasp$\rightarrow$Hover) 
+in a deterministic, headless physical environment.

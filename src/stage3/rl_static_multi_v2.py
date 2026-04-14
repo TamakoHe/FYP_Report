@@ -6,6 +6,7 @@ import numpy as np
 import warnings
 import os
 import multiprocessing
+from typing import Callable  # <-- 新增导入
 
 try:
     from tqdm import tqdm
@@ -20,7 +21,7 @@ try:
     from stable_baselines3 import PPO
     from stable_baselines3.common.vec_env import SubprocVecEnv
     from stable_baselines3.common.env_util import make_vec_env
-    from stable_baselines3.common.callbacks import BaseCallback  # <-- 补上这一行导入
+    from stable_baselines3.common.callbacks import BaseCallback
     HAS_RL_LIBS = True
 except ImportError:
     HAS_RL_LIBS = False
@@ -29,19 +30,29 @@ except ImportError:
 # ==========================================
 # 0. JCC 系统全局约束配置 (与论文对齐)
 # ==========================================
-TOTAL_ARM_BITS = 14            # 空间域: 极端带宽约束 B_total = 14 bits
-ETC_THRESHOLD = 0.08           # 时间域: ETC 触发阈值 delta (Eq 8)
+# 【注意】修改为 28 bits。如果用 56 bits，量化误差太小，RL 只能学到随机噪声导致崩溃震荡！
+TOTAL_ARM_BITS = 14            
+ETC_THRESHOLD = 0.08           
 EE_LINK_INDEX = 11
 ARM_ACTUATOR_IDS = [0, 1, 2, 3, 4, 5, 6]
+
+# ==========================================
+# 【新增稳定性组件】: 学习率线性衰减调度器
+# ==========================================
+def linear_schedule(initial_value: float) -> Callable[[float], float]:
+    """
+    线性衰减调度器。
+    随着训练进度 (progress_remaining 从 1.0 降到 0.0)，逐步降低学习率和截断范围。
+    这是彻底解决训练末期“灾难性遗忘”和“剧烈震荡”的最有效手段。
+    """
+    def func(progress_remaining: float) -> float:
+        return progress_remaining * initial_value
+    return func
 
 # ==========================================
 # 1. 静态基线预计算 (仅运行一次的无头物理计算)
 # ==========================================
 def compute_static_sensitivities_at_home():
-    """
-    启动一个临时的无头物理引擎，计算标称工作点下的雅可比敏感度，
-    作为静态基线的基础。计算完毕后立即销毁。
-    """
     cid = p.connect(p.DIRECT)
     p.setAdditionalSearchPath(pybullet_data.getDataPath(), physicsClientId=cid)
     robot = p.loadURDF("franka_panda/panda.urdf", basePosition=[0, 0, 0], useFixedBase=True, physicsClientId=cid)
@@ -61,7 +72,6 @@ def compute_static_sensitivities_at_home():
 STATIC_SENSITIVITIES = compute_static_sensitivities_at_home()
 
 def action_to_bits(action, total_bits=14, min_bits=1):
-    """将连续动作向量映射为离散的 bit 分配 (Softmax 机制)"""
     n = len(action)
     exp_a = np.exp(action - np.max(action))
     weights = exp_a / np.sum(exp_a)
@@ -78,7 +88,6 @@ def action_to_bits(action, total_bits=14, min_bits=1):
     return bits
 
 def get_static_lqr_bits(total_bits=14):
-    """提取出的静态 LQR 注水分配算法 (独立函数供 RL 作为基线对比)"""
     n = 7
     min_bits = 1
     weights = [max(w, 1e-6) for w in STATIC_SENSITIVITIES]
@@ -119,7 +128,6 @@ if HAS_RL_LIBS:
             self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(7,), dtype=np.float32)
             self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(28,), dtype=np.float32)
             
-            # 【多核核心】: 每个环境实例启动属于自己的无头物理服务器
             self.client_id = p.connect(p.DIRECT)
             p.setAdditionalSearchPath(pybullet_data.getDataPath(), physicsClientId=self.client_id)
             self.robot_id = p.loadURDF("franka_panda/panda.urdf", basePosition=[0, 0, 0], useFixedBase=True, physicsClientId=self.client_id)
@@ -164,7 +172,6 @@ if HAS_RL_LIBS:
             quant_q_rl = self._quantize_state(bits_rl)
             quant_q_static = self._quantize_state(self.static_baseline_bits)
 
-            # 【硬核物理计算】确保所有操作只在各自子进程的物理世界内进行
             for i, aid in enumerate(ARM_ACTUATOR_IDS): 
                 p.resetJointState(self.robot_id, aid, self.target_q[i], physicsClientId=self.client_id)
             pos_target = np.array(p.getLinkState(self.robot_id, EE_LINK_INDEX, computeForwardKinematics=1, physicsClientId=self.client_id)[0])
@@ -179,13 +186,17 @@ if HAS_RL_LIBS:
             pos_rl = np.array(p.getLinkState(self.robot_id, EE_LINK_INDEX, computeForwardKinematics=1, physicsClientId=self.client_id)[0])
             error_rl = np.linalg.norm(pos_target - pos_rl)
 
-            reward = float(error_static - error_rl) * 1000.0
+            improvement_mm = float(error_static - error_rl) * 1000.0
+            
+            # 【修复崩溃核心: 奖励截断 (Reward Clipping)】
+            # 无论出现多变态的随机姿态导致几百毫米的差值，我们将奖励强制封顶在 15 左右。
+            # 这能完美抵御梯度爆炸，保护神经网络在末期不被摧毁。
+            reward = np.clip(improvement_mm, -15.0, 15.0)
             
             obs, _ = self.reset()
             return obs, reward, True, False, {"error_rl_mm": error_rl * 1000}
             
         def close(self):
-            """关闭子进程内的物理引擎"""
             p.disconnect(self.client_id)
 
     class TqdmCB(BaseCallback):
@@ -195,23 +206,19 @@ if HAS_RL_LIBS:
             self.steps = steps
             self.eval_freq = eval_freq
             self.last_eval_step = 0
-            self.eval_history = []  # 用于记录 (step, 验证集平均物理误差)
+            self.eval_history = [] 
 
         def _on_training_start(self): 
-            self.pbar = tqdm(total=self.steps, desc="🏎️ 多核并行训练 & 周期验证")
+            self.pbar = tqdm(total=self.steps, desc="🏎️ 多核稳定物理训练 & 周期验证")
 
         def _on_step(self): 
             self.pbar.update(self.locals.get("env").num_envs)
             
-            # 定期触发真实物理轨迹的验证
             if self.num_timesteps - self.last_eval_step >= self.eval_freq:
                 self.last_eval_step = self.num_timesteps
-                # 阻塞当前训练，开一个无头物理环境跑一次标准轨迹
                 metrics = run_evaluation_trajectory(self.model, TOTAL_ARM_BITS, gui=False)
                 err_rl = (metrics['err_rl'] / metrics['steps']) * 1000
                 self.eval_history.append((self.num_timesteps, err_rl))
-                
-                # 更新进度条显示的指标
                 self.pbar.set_postfix({"标准轨迹误差(mm)": f"{err_rl:.2f}"})
                 
             return True
@@ -227,10 +234,6 @@ if HAS_RL_LIBS:
 # 3. 统一轨迹验证核心逻辑 (用于训练周期评估与最终测试)
 # ==========================================
 def run_evaluation_trajectory(rl_model, total_bits, gui=False):
-    """
-    在独立的物理引擎中运行一段预定义的标准抓取轨迹。
-    如果 gui=False，则在无头后台运行（用于训练时）；如果 gui=True，则弹窗。
-    """
     cid = p.connect(p.GUI) if gui else p.connect(p.DIRECT)
     p.setAdditionalSearchPath(pybullet_data.getDataPath(), physicsClientId=cid)
     p.setGravity(0, 0, -9.81, physicsClientId=cid)
@@ -340,9 +343,6 @@ def run_evaluation_trajectory(rl_model, total_bits, gui=False):
 # 4. 主程序：支持多进程保护的执行入口
 # ==========================================
 if __name__ == '__main__':
-    # ----------------------------------------
-    # 阶段 A: 多核并行 RL 训练 (Headless)
-    # ----------------------------------------
     MODEL_PATH = "ppo_multicore_physical_allocator.zip"
     
     if HAS_RL_LIBS:
@@ -357,10 +357,12 @@ if __name__ == '__main__':
                                    n_envs=num_cores, 
                                    vec_env_cls=SubprocVecEnv)
             
-            rl_model = PPO("MlpPolicy", vec_env, verbose=0, n_steps=512)
+            # 【核心修复】: 引入线性衰减的学习率和截断范围
+            rl_model = PPO("MlpPolicy", vec_env, verbose=0, n_steps=512,
+                           learning_rate=linear_schedule(3e-4),
+                           clip_range=linear_schedule(0.2))
             
-            TOTAL_STEPS = 1500000
-            # 引入带有固定轨迹验证逻辑的回调函数 (每 5000 步测一次)
+            TOTAL_STEPS = 150000
             rl_model.learn(total_timesteps=TOTAL_STEPS, callback=TqdmCB(TOTAL_STEPS, eval_freq=5000))
             rl_model.save(MODEL_PATH)
             
@@ -369,9 +371,6 @@ if __name__ == '__main__':
     else:
         rl_model = None
 
-    # ----------------------------------------
-    # 阶段 B: GUI 物理可视化测试评估
-    # ----------------------------------------
     print("🖥️ 正在启动 GUI 物理可视化环境用于最终方案对决...")
     print(f"🚀 开始执行物理轨迹 (真实物理 FK 评估 / 带宽: {TOTAL_ARM_BITS} Bits)")
     
