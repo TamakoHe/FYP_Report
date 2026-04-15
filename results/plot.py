@@ -5,12 +5,12 @@ import numpy as np
 # ==========================================
 # 1. 加载与预处理数据
 # ==========================================
-raw_data_eval_err = pd.read_csv("14_3/eval_trajectory_errors.csv")
+raw_data_eval_err = pd.read_csv("/Users/hewenxiao/Documents/2026/FYP_Report/results/14_4/training_convergence_14bit.csv")
 tot_data = 25
 
 # 优化提取逻辑: 利用 pandas 的切片功能，告别 for 循环
 # 直接将截取后的数据转换为 numpy 数组
-eval_errs = raw_data_eval_err["Error_RL_mm"].iloc[:tot_data].values
+eval_errs = raw_data_eval_err["Mean_Reward"].iloc[:tot_data].values
 r_step = np.arange(tot_data)
 
 # ==========================================

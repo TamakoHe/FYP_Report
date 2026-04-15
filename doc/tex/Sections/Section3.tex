@@ -1,104 +1,132 @@
-\section{Experiments and Results}
-\subsection{Experimental Setup and Implementation Details}
-To comprehensively evaluate the performance, robustness, and real-world applicability of the proposed Joint Communication and Control (JCC)
-architecture, a rigorous two-stage validation methodology was designed. This methodology encompasses both high-fidelity software 
-simulations and physical hardware deployments. This section outlines the precise configuration of the simulation environment,
-the DRL training pipeline, and the real-world robotic setup, ensuring the complete reproducibility of the experiments presented in this study.
-\subsubsection{Simulation Environment Configuration (PyBullet)}
-The primary testbed for training the reinforcement learning agent and validating the extreme bandwidth constraints was constructed 
-using the PyBullet engine (Version 3.25). PyBullet was selected due to its highly optimized rigid-body dynamics, accurate 
-collision detection algorithms, and robust support for simulating complex robotic manipulators.
+% \section{Experiments and Results}
+% \subsection{Experimental Setup and Implementation Details}
+% To comprehensively evaluate the performance, robustness, and real-world applicability of the proposed Joint Communication and Control (JCC)
+% architecture, a rigorous two-stage validation methodology was designed. This methodology encompasses both high-fidelity software 
+% simulations and physical hardware deployments. This section outlines the precise configuration of the simulation environment,
+% the DRL training pipeline, and the real-world robotic setup, ensuring the complete reproducibility of the experiments presented in this study.
+% \subsubsection{Simulation Environment Configuration (PyBullet)}
+% The primary testbed for training the reinforcement learning agent and validating the extreme bandwidth constraints was constructed 
+% using the PyBullet engine (Version 3.25). PyBullet was selected due to its highly optimized rigid-body dynamics, accurate 
+% collision detection algorithms, and robust support for simulating complex robotic manipulators.
 
-\noindent\textbf{1. Physics Engine and Kinematic Settings}: The target object within the simulation is a highly 
-accurate Unified Robot Description Format (URDF) model of the 7-Degree-of-Freedom (DOF) Franka Emika Panda robotic manipulator.
-To accurately capture the non-linear physical dynamics, inertial effects, and transient tracking errors, the physics engine was configured 
-with the following parameters:
-\begin{itemize}
-    \item \textbf{Control and Integration Step}: The engine operates with a base controls frequency of 240 Hz (a step size of $\frac{1}{240}$ seconds). This high-frequency loop closely mirrors the real-time operational standard of modern industrial controllers.
-    \item \textbf{Gravitational Acceleration}: The environmental gravity vector was set to standard Earth gravity $[0,0,-9.81]\;m/s^2$, forcing the allocation algorithms to actively compensate for gravity-induced steady-state errors, particularly at the base and shoulder joints.
-    \item \textbf{Solver Parameters}: The inverse kinematics (IK) solver was configured with a maximum of 100 iterations and residual threshold of $1\times10^{-5}$ to ensure that the target reference states ($q_{target}$) provided to the allocation algorithms are geometrically flawless.
-\end{itemize}
-\noindent\textbf{2. Multiprocessing Vectorized Architecture}: During the development of the physics-informed Reward Shaping mechanism,
-it was observed that computing the real-time Forward Kinematics (FK) and 3D Euclidean distances at every step introduced a severe 
-computational bottleneck. Operating on a single CPU core severely restricted the the agent's exploration capacity.
+% \noindent\textbf{1. Physics Engine and Kinematic Settings}: The target object within the simulation is a highly 
+% accurate Unified Robot Description Format (URDF) model of the 7-Degree-of-Freedom (DOF) Franka Emika Panda robotic manipulator.
+% To accurately capture the non-linear physical dynamics, inertial effects, and transient tracking errors, the physics engine was configured 
+% with the following parameters:
+% \begin{itemize}
+%     \item \textbf{Control and Integration Step}: The engine operates with a base controls frequency of 240 Hz (a step size of $\frac{1}{240}$ seconds). This high-frequency loop closely mirrors the real-time operational standard of modern industrial controllers.
+%     \item \textbf{Gravitational Acceleration}: The environmental gravity vector was set to standard Earth gravity $[0,0,-9.81]\;m/s^2$, forcing the allocation algorithms to actively compensate for gravity-induced steady-state errors, particularly at the base and shoulder joints.
+%     \item \textbf{Solver Parameters}: The inverse kinematics (IK) solver was configured with a maximum of 100 iterations and residual threshold of $1\times10^{-5}$ to ensure that the target reference states ($q_{target}$) provided to the allocation algorithms are geometrically flawless.
+% \end{itemize}
+% \noindent\textbf{2. Multiprocessing Vectorized Architecture}: During the development of the physics-informed Reward Shaping mechanism,
+% it was observed that computing the real-time Forward Kinematics (FK) and 3D Euclidean distances at every step introduced a severe 
+% computational bottleneck. Operating on a single CPU core severely restricted the the agent's exploration capacity.
 
-To overcome this, a multiprocessing vectorized architecture was implemented using the \inlinecode{SubprocVecEnv} wrapper from 
-the \inlinecode{stable-baseline3} library. The training environment was parallelized across 10 independent, headless (non-GUI) PyBullet
-physics servers running on an [Apple M4] processor. This architecture allows the agent to explore hundreds of thousands of complex physical 
-interactions simultaneously, accelerating the convergence speed by nearly an order of magnitude while preventing the model from overfitting to a single state 
-trajectory.
+% To overcome this, a multiprocessing vectorized architecture was implemented using the \inlinecode{SubprocVecEnv} wrapper from 
+% the \inlinecode{stable-baseline3} library. The training environment was parallelized across 10 independent, headless (non-GUI) PyBullet
+% physics servers running on an [Apple M4] processor. This architecture allows the agent to explore hundreds of thousands of complex physical 
+% interactions simultaneously, accelerating the convergence speed by nearly an order of magnitude while preventing the model from overfitting to a single state 
+% trajectory.
 
-\noindent\textbf{3. DRL Agent Hyperparameters}: The intelligent bit-allocation agent was trained utilizing the Proximal Policy Optimization (PPO) algorithm under 
-an Actor-Critic framework. The policy and value networks were constructed using Multilayer Perceptions (MLP) with two hidden layers
-of 128 neurons each, activated by ReLU functions. The training process spanned 100,000 time steps to ensure complete convergence 
-under hard physical feedback. The critical hyper parameters, tuned through iterative heuristic experimentation, are detailed in Table \ref{tab:para}.
-\begin{table}[H]
-    \centering
-    \small
-    \begin{tabular}{|l|l|l|}
-        \hline
-        Hyperparameter                      & Value & Description                                              \\ \hline
-        \textbf{Algorithm Framework}        & PPO   & Actor-Critic architecture for continuous action spaces.  \\ \hline
-        \textbf{Network Architecture}     & MLP {[}128, 128{]} & Two hidden layers with 128 nodes for both Actor and Critic.     \\ \hline
-        \textbf{Total Timesteps}          & 100,000            & Sufficient for hard-negative mining and physical stabilization. \\ \hline
-        \textbf{Learning Rate ($\alpha$)} & $3 \times 10^{-4}$ & Constant learning rate for stable gradient descent.             \\ \hline
-        \textbf{Discount Factor ($\gamma$)} & 0.99  & High emphasis on long-term reward maximization.          \\ \hline
-        \textbf{Batch Size}                 & 64    & Number of experiences used for a single gradient update. \\ \hline
-        \textbf{Steps per Environment}      & 512   & Rollout buffer size before updating the policy.          \\ \hline
-        \textbf{Clip Range ($\epsilon$)}    & 0.2   & Prevents destructively large policy updates.             \\ \hline
-        \textbf{Entropy Coefficient}        & 0.01  & Encourages initial exploration of extreme allocations.   \\ \hline
-    \end{tabular}
-    \caption{PPO Training Hyperparameters for JCC Bandwidth Allocation}
-    \label{tab:para}
-\end{table}
-\subsubsection{Real-World Hardware Setup (Franka Emika Panda)}
-% TODO: 这个部分要在实验中写
-\subsection{Simulation Results: Unlocking Extreme Bandwidth Limits}
-\subsubsection{Training Convergence and Reward Analysis (Experiment 1)}
-Before evaluating the final tracking performance of the robotic manipulator, it is imperative to analyze the training dynamics 
-and convergence behavior of the PPO agent. Training a DRL agent within a highly non-linear, rigid-body physics environment presents 
-significant challenges, particularly due to the discontinuous nature of extreme bit quantization (e.g., 1-bit or 2-bit allocations) 
-and the resulting high-variance physical feedback.
+% \noindent\textbf{3. DRL Agent Hyperparameters}: The intelligent bit-allocation agent was trained utilizing the Proximal Policy Optimization (PPO) algorithm under 
+% an Actor-Critic framework. The policy and value networks were constructed using Multilayer Perceptions (MLP) with two hidden layers
+% of 128 neurons each, activated by ReLU functions. The training process spanned 100,000 time steps to ensure complete convergence 
+% under hard physical feedback. The critical hyper parameters, tuned through iterative heuristic experimentation, are detailed in Table \ref{tab:para}.
+% \begin{table}[H]
+%     \centering
+%     \small
+%     \begin{tabular}{|l|l|l|}
+%         \hline
+%         Hyperparameter                      & Value & Description                                              \\ \hline
+%         \textbf{Algorithm Framework}        & PPO   & Actor-Critic architecture for continuous action spaces.  \\ \hline
+%         \textbf{Network Architecture}     & MLP {[}128, 128{]} & Two hidden layers with 128 nodes for both Actor and Critic.     \\ \hline
+%         \textbf{Total Timesteps}          & 100,000            & Sufficient for hard-negative mining and physical stabilization. \\ \hline
+%         \textbf{Learning Rate ($\alpha$)} & $3 \times 10^{-4}$ & Constant learning rate for stable gradient descent.             \\ \hline
+%         \textbf{Discount Factor ($\gamma$)} & 0.99  & High emphasis on long-term reward maximization.          \\ \hline
+%         \textbf{Batch Size}                 & 64    & Number of experiences used for a single gradient update. \\ \hline
+%         \textbf{Steps per Environment}      & 512   & Rollout buffer size before updating the policy.          \\ \hline
+%         \textbf{Clip Range ($\epsilon$)}    & 0.2   & Prevents destructively large policy updates.             \\ \hline
+%         \textbf{Entropy Coefficient}        & 0.01  & Encourages initial exploration of extreme allocations.   \\ \hline
+%     \end{tabular}
+%     \caption{PPO Training Hyperparameters for JCC Bandwidth Allocation}
+%     \label{tab:para}
+% \end{table}
+% \subsubsection{Real-World Hardware Setup (Franka Emika Panda)}
+% % TODO: 这个部分要在实验中写
+% \subsection{Simulation Results: Unlocking Extreme Bandwidth Limits}
+% \subsubsection{Training Convergence and Reward Analysis (Experiment 1)}
+% Before evaluating the final tracking performance of the robotic manipulator, it is imperative to analyze the training dynamics 
+% and convergence behavior of the PPO agent. Training a DRL agent within a highly non-linear, rigid-body physics environment presents 
+% significant challenges, particularly due to the discontinuous nature of extreme bit quantization (e.g., 1-bit or 2-bit allocations) 
+% and the resulting high-variance physical feedback.
 
-To rigorously isolate the policy improvement from they environment stochasticity introduced by the Domain Randomization and Hard Negative 
-Mining strategies, a standardized evaluation protocol was implemented. During the 100,000-timestep training process, the agent's 
-policy was temporarily frozen every 5,000 steps to execute a fixed, predefined evaluation trajectory (Hover$\rightarrow$Grasp$\rightarrow$Hover) 
-in a deterministic, headless physical environment.
-\begin{figure}[H]
-    \centering
-    \includegraphics{Figures/Figure_1.png}
-    \caption{Convergence curve of the PPO agent's end-effector tracking error (evaluated on a standard trajectory) over 25 evaluation intervals. 
-    The curve illustrates the agent's transition from initial random exploration, through transient trust-region oscillations, to the successful discovery of pragmatic bandwidth allocation strategies.}
-    \label{fig:conv}
-\end{figure}
-As vividly captured Fig \ref{fig:conv}, the training convergence process is not a simplistic monotonic decline but dynamically 
-reflects the agent's complex learning behavior, which can be dissected into four distinct phases:
+% To rigorously isolate the policy improvement from they environment stochasticity introduced by the Domain Randomization and Hard Negative 
+% Mining strategies, a standardized evaluation protocol was implemented. During the 100,000-timestep training process, the agent's 
+% policy was temporarily frozen every 5,000 steps to execute a fixed, predefined evaluation trajectory (Hover$\rightarrow$Grasp$\rightarrow$Hover) 
+% in a deterministic, headless physical environment.
+% \begin{figure}[H]
+%     \centering
+%     \includegraphics{Figures/Figure_1.png}
+%     \caption{Convergence curve of the PPO agent's end-effector tracking error (evaluated on a standard trajectory) over 25 evaluation intervals. 
+%     The curve illustrates the agent's transition from initial random exploration, through transient trust-region oscillations, to the successful discovery of pragmatic bandwidth allocation strategies.}
+%     \label{fig:conv}
+% \end{figure}
+% As vividly captured Fig \ref{fig:conv}, the training convergence process is not a simplistic monotonic decline but dynamically 
+% reflects the agent's complex learning behavior, which can be dissected into four distinct phases:
 
-\noindent\textbf{1. Initial Plateau and Blind Exploration Phase (Evaluations 0 to 5)}: In the initial stages of training, the Actor 
-network's weights are randomly initialized, leading to stochastic bandwidth allocation across the 7-DOF joints. Because the agent 
-has not yet learned the "lever effect" of the manipulator, it experiences massive trajectory deviations, forming a rigid performance 
-plateau at roughly \textbf{581 mm}. This phase perfectly validates the necessity of the Hard Negative Mining strategy; the environment 
-yields consistent, unyielding penalties, coercing the agent to desperately search for a viable gradient out of the sub-optimal uniform 
-allocation trap.
+% \noindent\textbf{1. Initial Plateau and Blind Exploration Phase (Evaluations 0 to 5)}: In the initial stages of training, the Actor 
+% network's weights are randomly initialized, leading to stochastic bandwidth allocation across the 7-DOF joints. Because the agent 
+% has not yet learned the "lever effect" of the manipulator, it experiences massive trajectory deviations, forming a rigid performance 
+% plateau at roughly \textbf{581 mm}. This phase perfectly validates the necessity of the Hard Negative Mining strategy; the environment 
+% yields consistent, unyielding penalties, coercing the agent to desperately search for a viable gradient out of the sub-optimal uniform 
+% allocation trap.
 
-\noindent\textbf{2. Rapid Descent and "Pragmatic" Discovery Phase (Evaluations 5 to 10)}: Following the initial exploratory penalty, the curve exhibits a 
-steep, sharp descent, with the error dropping rapidly from 581 mm to approximately \textbf{505 mm}. Driven by the physics-informed 
-Reward Shaping mechanism, the PPO agent achieves a critical policy breakthrough. It discovers the fundamental principle of Pragmatic 
-Communication: the optimal strategy is to proactively strip bit from robust, distal joints (such as the wrist) and unconditionally secure 
-high-precision transmission for the critical base and shoulder joints.
+% \noindent\textbf{2. Rapid Descent and "Pragmatic" Discovery Phase (Evaluations 5 to 10)}: Following the initial exploratory penalty, the curve exhibits a 
+% steep, sharp descent, with the error dropping rapidly from 581 mm to approximately \textbf{505 mm}. Driven by the physics-informed 
+% Reward Shaping mechanism, the PPO agent achieves a critical policy breakthrough. It discovers the fundamental principle of Pragmatic 
+% Communication: the optimal strategy is to proactively strip bit from robust, distal joints (such as the wrist) and unconditionally secure 
+% high-precision transmission for the critical base and shoulder joints.
 
-\noindent\textbf{3. Transient Rebound and Trust-Region Oscillation (Evaluation 10 to 14)}: Intersetingly, the learning curve not remain perfectly 
-stable after the initial drop. Between evaluations 10 and 14, a visible rebound occurs, pushing the error temporarily back up a local peak of 
-\textbf{547 mm}. This behavior is classic characteristic of PPO's trust-region updates intersecting with highly non-linear physical constraints.
-As the agent aggressively pushes the "pragmatic" limits--perhaps attempting to strip too many bits from the wrist joints to further 
-optimize the base--it encounters severe physical instability. The clipping mechanism of PPO proves vital here preventing the policy from collapsing 
-entirely during this over-exploratory phase.
+% \noindent\textbf{3. Transient Rebound and Trust-Region Oscillation (Evaluation 10 to 14)}: Intersetingly, the learning curve not remain perfectly 
+% stable after the initial drop. Between evaluations 10 and 14, a visible rebound occurs, pushing the error temporarily back up a local peak of 
+% \textbf{547 mm}. This behavior is classic characteristic of PPO's trust-region updates intersecting with highly non-linear physical constraints.
+% As the agent aggressively pushes the "pragmatic" limits--perhaps attempting to strip too many bits from the wrist joints to further 
+% optimize the base--it encounters severe physical instability. The clipping mechanism of PPO proves vital here preventing the policy from collapsing 
+% entirely during this over-exploratory phase.
 
-\noindent\textbf{4. Steady-State Convergence and Fine-Tuning (Evaluations 15 to 24)}: After recovering from the transient rebound, 
-the agent actively corrects its over-aggressive allocation strategy. The curve resumes its descent and finally stabilizes below 500 mm, 
-reaching a convergence asymptoe of approximately \textbf{485 mm}. This final smooth convergence is heavily supported by the linear learning 
-rate scheduling and reward exploitation, securely "locking in" the learned pragmatic allocation policy.
+% \noindent\textbf{4. Steady-State Convergence and Fine-Tuning (Evaluations 15 to 24)}: After recovering from the transient rebound, 
+% the agent actively corrects its over-aggressive allocation strategy. The curve resumes its descent and finally stabilizes below 500 mm, 
+% reaching a convergence asymptoe of approximately \textbf{485 mm}. This final smooth convergence is heavily supported by the linear learning 
+% rate scheduling and reward exploitation, securely "locking in" the learned pragmatic allocation policy.
 
-Ultimately, the successful convergence of the PPO agent verifies that an artificial intelligence model can organically internalize 
-complex mechanical kinematics and non-linear sensitivity profiles, laying a robust foundation for the subsequent extreme bandwidth tracking experiments.
-\subsubsection{Spatial Domain: 14-Bit Extreme Tracking (Experiment 2)}
+% Ultimately, the successful convergence of the PPO agent verifies that an artificial intelligence model can organically internalize 
+% complex mechanical kinematics and non-linear sensitivity profiles, laying a robust foundation for the subsequent extreme bandwidth tracking experiments.
+% \subsubsection{Spatial Domain: 14-Bit Extreme Tracking (Experiment 2)}
+% Following the verification of the DRL agent's stable convergence, this experiment investigates the core spatial domain performance 
+% of the proposed Joint Communication and Control (JCC) framework. The primary objective is to evaluate how effectively the intelligent 
+% agent arbitrates limited network resources across the 7-DOF manipulator compared to traditional heuristics, particularly under severe 
+% channel degradation.
+
+% To comprehensively assess scalability and ensure that the RL policy generalizes rather than overfitting to a single movement, 
+% the evaluations were conducted across three distinct pick-and-place trajectories. 
+% Furthermore, the total bandwidth constraint ($B_{total}$) per sampling interval was systematically varied across distinct levels: 14, 21, 28, 35, and 56 bits. 
+% Three spatial allocation schemes were benchmarked:
+
+% % \noindent\textbf{1. Uniform Allocation (Average)}: A naive baseline that evenly distributes $B_{total}/7$ bits to each joint.
+% \begin{enumerate}
+%     \item \textbf{Uniform Allocation (Average)}: A naive baseline that evenly distributes $B_{total}/7$ bits to each joint.
+%     \item \textbf{Static LQR-Weighted Allocation}: A mathematically derived baseline that utilizes the static Jacobian sensitivity matrix (extracted at the nominal home posture) to perform logarithmic water-filling bit assignment.
+%     \item \textbf{DRL Dynamic Allocation (Proposed)}: The context-aware PPO agent that continuously redistributed bits based on the real-time physical state observation ($s_t$).
+% \end{enumerate}
+% \noindent\textbf{1. Task-Oriented Waypoint Accuracy and Error Suppression}
+% Aligned with the philosophy of Pragmatic Communication, the evaluation metric shifts focus from the rigid tracking of intermediate 
+% continuous trajectories to the actual \textbf{Task Success}. In a pick-and-place operation, the semantic succes of the task is predominately 
+% dictated by the accurate at specific critical keyframes. Therefore, the spatial error was quantified by measuring the 3D Euclidean distance deviation 
+% from the Ground Truth (GT) at two highly critical waypoints: the \textbf{Grasp Point} and the \textbf{Final Placement Point}.
+
+% The averaged waypoint errors across the three distinct trajectories under varying bandwidth constraints are summarized in 
+\section{Simulation Experiments and Results Analysis}
+To rigorously validate the proposed Deep Reinforcement Learning (DRL)-driven Joint Communication and Control (JCC) framework,
+comprehensive cyber-physical simulations were conducted. This chapter details the experimental setup, analyzes the training 
+dynamics of the DRL agent, and presents a deep comparative evaluation against traditional allocation heuristic under diverse 
+extreme bandwidth constraints.
