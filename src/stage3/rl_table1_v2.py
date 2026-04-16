@@ -37,7 +37,7 @@ except ImportError:
 # ==========================================
 # 0. JCC 系统全局约束配置 (与论文对齐)
 # ==========================================
-TOTAL_ARM_BITS = 42            
+TOTAL_ARM_BITS = 28            
 ETC_THRESHOLD = 0.0           
 EE_LINK_INDEX = 11
 ARM_ACTUATOR_IDS = [0, 1, 2, 3, 4, 5, 6]
@@ -385,7 +385,7 @@ def run_evaluation_trajectory(rl_model, total_bits, gui=False):
 # 4. 主程序
 # ==========================================
 if __name__ == '__main__':
-    MODEL_PATH = "ppo_multicore_physical_allocator.zip"
+    MODEL_PATH = "ppo_multicore_physical_allocator_v3_28.zip"
     
     if HAS_RL_LIBS:
         if os.path.exists(MODEL_PATH):

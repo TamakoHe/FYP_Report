@@ -9,6 +9,11 @@ The experiments were deployed utilizing the \textbf{PyBullet} physics engine, wh
 The physical plant under control is the \textbf{Franka Emika Panda}, an industry-standard 7-DOF robotic manipulator. 
 The robot is initialized near a nomial safe home posture ($q_{home} = [0, -\pi/4, 0, -3\pi/4, 0, \pi/2, \pi/4]^T$) to prevent 
 initial kinematic singularities.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{Figures/pybullet.png}
+    \caption{A illustration of a simulated Franka Emika Panda robotic arm by PyBullet}
+\end{figure}
 \subsubsection{Dual-Frequency Decoupling and DPCM Communication Channel}
 A critical innovation in our experimental design is the realistic modeling of the network channel. Traditional simulations often 
 erroneously equate the physical control frequency with the communication frequency, leading to artificial high-frequency quantization 
@@ -57,7 +62,7 @@ This steady, monotonic rise in the competitive reward demonstrates stable policy
 To evaluate the scalability of the proposed framework, the total available bandwidth ($B_{total}$) was swept from a saturated regime (56 bits)
 down to an extreme survival bottleneck (14 bits). The ultimate task success is evaluated using the \textbf{Steady-State Waypoint Error} at 
 the Grasp and Placement coordinates, completely eliminating dynamic tracking lag to isolate pure quantization precision.
-\begin{table}[htbp]
+\begin{table}[H]
 \centering
 \caption{Quantitative comparison of steady-state Euclidean deviation at critical waypoints across varying total bandwidth constraints ($B_{total}$).}
 \label{tab:bandwidth_scalability}
@@ -100,3 +105,39 @@ the Grasp and Placement coordinates, completely eliminating dynamic tracking lag
 \label{tab:bits}
 \end{table}
 The empirical data in Table \ref{tab:bits} reveals a profound non-linear relationship:
+\begin{enumerate}
+    \item \textbf{The Saturated Regime (42-56 bits)}: When bandwidth is abundant, quantization noise is negligible. All schemes perform exceptionally well ($\text{errors}<2\text{mm}$), and the necessity for complex dynamic allocation is marginal
+    \item \textbf{The Theoretical Validation Regime (21-35 bits)}: As bandwidth tightens, the Static LQR consistently outperforms the Uniform allocation. This validates the classical control theory that prioritizing bits to physically sensitive joints improves overall tracking.
+\end{enumerate}
+\subsubsection{The Collapse of Static Models at Extreme Bottlenecks (14-bit)}
+The most striking academic discovery occurs at the 14-bit limit (averaging 2bits/joint). Here, the mathematically derived \textbf{Static LQR suffers a catastrophic collapse},
+yielding a massive Grasp Error of 48.85mm, significantly underperforming the naive Uniform allocation (27.67 mm).
+
+This collapse physically proves the fundamental limitation of time-invariant models: \textbf{Jacobian Shifting}. 
+The Static LQR weights are computed at the initial safe posture. 
+When the manipulator stretches outward, its nonlinear kinematics fundamentally alter the sensitivity matrix. 
+The static algorithm rigidly forces bits to joints that are no longer critical, actively sabotaging the end-effector's precision.
+
+In stark contrast, the proposed \textbf{DRL agent achieves a commanding Grasp Error of 15.65 mm}. 
+By utilizing its real-time 3D spatial observation, the neural network implicitly acts as a dynamic Jacobian estimator, gracefully degrading the precision of distal wrist joints to secure high-resolution transmission for the heavily loaded base joints.
+\subsection{Ablation Studies and Engineering Considerations}
+To isolate contributions of specifc architectural innovations within our framework, a series of ablation studies were conducted.
+These studies highlight the critical engineering considerations required to bridge the gap between theoretical algorithms and realistic 
+physical simulations.
+\subsubsection{The Necessity of Steady-State Evaluation (Addressing Dynamic Tracking Lag)}
+Initial evaluations of the system measured the continuous tracking error while the manipulator was in full motion. However, this resulted 
+in an artificially inflated baseline error (e.g.,\textasciitilde 120mm) across all allocation schemes, regardless of the available bandwidth.
+
+\textbf{Analysis}: In physical systems, high-inertia motors operating at a decoupled 10 Hz communication rate constantly chase "stale" waypoints,
+creating a massive \textbf{Dynamic Tracking Lag}. If quantization accuracy is measured during this transient phase, the physical inertia completely 
+masks the underlying bit-allocation performance. \textbf{Solution}: By enforcing a 0.5-second \textbf{Settle Phase} (steady-state) at critical waypoints 
+before measuring the error, the physical momentum is nullified. This ablation mathematically isolates the pure quantization noise, proving 
+that traditional continuous-trajectory metrics are fundamentally flawed for evaluating low-frequency Networked Control Systems.
+\subsubsection{The "Seesaw Effect" and 3D Spatial Awareness Injection}
+During early training iterations, the RL agent was provided a standard 28-dimensional state vector (comprising only joint angles and velocities). 
+This led to the \textbf{"Seesaw Effect"}: the agent would achieve excellent precision at Grasp Point but fail catastrophically at the Placement Point.
+
+\textbf{Analysis}: Joint angles are highly abstract. Without explicit Cartesian coordinates, the agent lacks "Spatial Awareness" and fails to semantically differentiate between distinct operational phases (e.g., reaching vs. grasping).
+\textbf{Solution}: By expanding the observation space to \textbf{34 dimensions} (injecting the real-time $X,Y,Z$ coordinates of both the end-effector and the target), 
+the agent gained a comprehensive global spatial awareness. This spatial injection eliminated the Seesaw Effect, allowing the policy to dynamically switch distinct bit-allocation 
+strategies based on its absolute position in the workspace. 
