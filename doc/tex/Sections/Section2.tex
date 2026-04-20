@@ -13,8 +13,10 @@ This ensures that control commands are transmitted pragmatically over the networ
 
 %% TODO: 加入图表
 %% 这是一个大图 [图 3.1: 联合通信与控制系统 (JCC) 总体信息流架构图] (建议使用全页宽度的流程图，展示数据从真实传感器采集、边缘计算节点执行 ETC 判定与压缩、无线传输到接收端解压、控制电机输出的全过程)。
-\subsubsection{Robotic Manipulator Dynamics and State-Space Modeling}
-To derive control-oridented communication strategies, a rigorous mathematical model of the physical plant is required.
+\subsubsection{Physical Plant Dynamics}
+To derive control-oridented communication strategies, a rigorous mathematical model of the physical plant is required.\\
+
+\noindent\textbf{Robotic Manipulator Dynamic}:\\
 The continuous-time rigid-body dynamics of an $n$-degree-of-freedom (DOF) robotic manipulator (where $n = 7$ for our specific Franka Emika configuration) can be described by the following nonlinear second-order differential equation:
 \begin{equation}
     M(q)\ddot{q} + C(q,\dot{q})\dot{q} + G(q) = \tau
@@ -43,7 +45,30 @@ where $x_k \in \mathbb{R}^{2n}$ is the discrete state at time step $k$,$u_k \in 
 $w_k \in \mathbb{R}^{2n}$ represents the additive process noise (e.g., modeling inaccuracies and physical disturbances), assumed to be 
 zero-mean Gaussian noise with covariance $W$.
 Physically, matrix $A$ captures the system's inertia and internal state couping, while matrix $B$ maps the applied actuator torques 
-to the resulting state transitions.
+to the resulting state transitions.\\
+
+\noindent\textbf{Quadrotor UAV Dynamics}
+
+To rigorously demonstrate the universality of the proposed JCC framework across diverse physical paradigms, a quadrotor Unmanned 
+Aerial Vehicle (UAV) is modeled alongside the fully-actuated manipulator. The quadrotor is a classic it possesses 6 degrees of freedom but is controlled by only 4 independent inputs (one total thrust and three torques).
+
+The state space of the quadrotor is represented by a 12-dimensional vector:
+\begin{equation}
+    x = [p^T, v^T, \Theta^T, \omega^T]^T \in \mathbb{R}^{12}
+\end{equation}
+where $p=[x,y,z]^T$ is the inertial position, $v=[\dot{x}, \dot{y}, \dot{z}]^T$ is the linear velocity, $\Theta = [\phi, \theta, \psi]^T$ represents the Euler angles (roll, pitch, yaw), and $\omega = [p, q, r]^T$ denotes the body-frame angular velocities.
+
+Using the Newton-Euler formalism, the rigid-body dynamics are governed by:
+\begin{align}
+    \ddot{p} &= -g \mathbf{e}_3 + \frac{T}{m} R \mathbf{e}_3 - \frac{1}{m} F_{drag} \\
+    \dot{\omega} &= J^{-1} (\tau - \omega \times J \omega)
+\end{align}
+where $m$ is the mass, $g$ is gravity, $J$ is the inertia matrix, $R$ is the rotation matrix from body to inertial frame, $T$ is the total collective thrust,
+$\tau \in \mathbb{R}^3$ represents the control torques, and $F_{drag}$ denotes external aerodynamic disturbances (e.g., wind gusts).
+
+In a severely bandwidth-constrained NCS, the underactuated nature of the UAV poses a critical survival challenge: 
+quantization errors in the attitude states ($\phi, \theta$) will instantly lead to misdirected thrust vectors, causing unrecoverable catastrophic crashes, 
+whereas errors in translational positions ($x, y$) merely result in tolerable drifting.
 \subsubsection{Bandwidth-Limited Communication Network Model}
 The critical constraint in this thesis is the extreme limitation of the communication channel. 
 Let the network capacity limit be strictly defined as a maximum allowed budget of $B_{total}$ bits per sampling interval $T_s$. 

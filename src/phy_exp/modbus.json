@@ -1,0 +1,46 @@
+{
+  "frequency": 10,
+  "modules": [
+    {
+      "ip": "192.168.0.2",
+      "port": "502",
+      "inputs": [
+        {
+          "read_address": 0,
+          "count": 16,
+          "type": "register",
+          "pin_names": {
+            "1": "Target_J1",
+            "2": "Target_J2",
+            "3": "Target_J3",
+            "4": "Target_J4",
+            "5": "Target_J5",
+            "6": "Target_J6",
+            "7": "Target_J7"
+          }
+        },
+        {
+          "read_address": 100,
+          "count": 8,
+          "type": "coil",
+          "pin_names": {
+            "1": "Execute_Trigger"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "read_address": 200,
+          "write_address": 200,
+          "count": 16,
+          "type": "register",
+          "pin_names": {
+            "1": "Robot_Status_Feedback"
+          }
+        }
+      ]
+    }
+  ],
+  "master": "tcp://localhost:11511",
+  "interface": "lo"
+}

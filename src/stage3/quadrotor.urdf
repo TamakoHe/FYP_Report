@@ -1,0 +1,91 @@
+<?xml version="1.0" ?>
+<robot name="quadrotor">
+  <link name="base_link">
+    <!-- 物理惯性参数 (Mass and Inertia): 提升惯性张量，并【降低重心】 -->
+    <!-- 核心外挂：下调重心(Z=-0.05)会产生物理上的“钟摆效应(Pendulum Effect)”，极大增强被动抗风和自稳定能力，帮助 RL 容错 -->
+    <inertial>
+      <mass value="0.5"/>
+      <origin xyz="0 0 -0.05" rpy="0 0 0"/>
+      <inertia ixx="0.008" ixy="0" ixz="0" iyy="0.008" iyz="0" izz="0.015"/>
+    </inertial>
+
+    <!-- 视觉：中心机身 (Center Body) -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.1 0.1 0.05"/>
+      </geometry>
+      <material name="dark_grey">
+        <color rgba="0.2 0.2 0.2 1.0"/>
+      </material>
+    </visual>
+
+    <!-- 碰撞体积 (Collision Box) -->
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.2 0.2 0.05"/>
+      </geometry>
+    </collision>
+
+    <!-- 视觉：机臂 (Arms) -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0.785398"/>
+      <geometry>
+        <box size="0.3 0.02 0.01"/>
+      </geometry>
+      <material name="white">
+        <color rgba="0.9 0.9 0.9 1.0"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 -0.785398"/>
+      <geometry>
+        <box size="0.3 0.02 0.01"/>
+      </geometry>
+      <material name="white">
+        <color rgba="0.9 0.9 0.9 1.0"/>
+      </material>
+    </visual>
+
+    <!-- 视觉：红色前螺旋桨 (Front Rotors - Red) -->
+    <visual>
+      <origin xyz="0.106 0.106 0.02" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.08" length="0.005"/>
+      </geometry>
+      <material name="red">
+        <color rgba="0.8 0.1 0.1 0.5"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="-0.106 0.106 0.02" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.08" length="0.005"/>
+      </geometry>
+      <material name="red">
+        <color rgba="0.8 0.1 0.1 0.5"/>
+      </material>
+    </visual>
+
+    <!-- 视觉：黑色后螺旋桨 (Back Rotors - Black) -->
+    <visual>
+      <origin xyz="0.106 -0.106 0.02" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.08" length="0.005"/>
+      </geometry>
+      <material name="black">
+        <color rgba="0.1 0.1 0.1 0.5"/>
+      </material>
+    </visual>
+    <visual>
+      <origin xyz="-0.106 -0.106 0.02" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.08" length="0.005"/>
+      </geometry>
+      <material name="black">
+        <color rgba="0.1 0.1 0.1 0.5"/>
+      </material>
+    </visual>
+  </link>
+</robot>
