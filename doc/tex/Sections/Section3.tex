@@ -143,3 +143,47 @@ This led to the \textbf{"Seesaw Effect"}: the agent would achieve excellent prec
 the agent gained a comprehensive global spatial awareness. This spatial injection eliminated the Seesaw Effect, allowing the policy to dynamically switch distinct bit-allocation 
 strategies based on its absolute position in the workspace. 
 \subsection{Scenario Two: Underactuated Quadrotor Navigation and Survival}
+To prove that the proposed DRL allocator acts as a universal, 
+paradigm-agnostic JCC framework, a supplementary cyber-physical evaluation was conducted using a Quadrotor UAV. 
+Unlike the fully-actuated mechanical manipulator, which simply halts or deviates when bandwidth is insufficient, an underactuated quadrotor represents a "life-or-death" control scenario where severe quantization noise leads to immediate aerodynamic stalling and catastrophic crashing.
+\subsubsection{Experimental Setup and Extreme Bottleneck}
+The UAV simulation was constructed using the PyBullet physics engine. The total channel capacity was severely choked to a strict $B_{total} = 24$ bits per transmission to carry the 12-dimensional state vector (averaging a mere 2 bits per state). 
+The communication frequency remained decoupled at 10 Hz, while the inner-loop PID flight controller operated at 240 Hz based on the ZOH-reconstructed quantized states.
+
+To comprehensively test the robustness and adaptability of the allocation schemes, the evaluation was divided into two distinct, highly hostile operational scenarios:
+\begin{enumerate}
+    \item \textbf{Scenario A - Severe Wind Hovering (Wind Level: 2.0)}: The UAV is commanded to maintain a stationary hover while being subjected to a continuous, severe wind disturbance. This tests the baseline survival capability.
+    \item \textbf{Scenario B - Dynamic Maneuvering under Strong Wind (Wind Level: 1.5)}: The UAV maintains a hover for the first 5.0 seconds. At exactly $T = 5.0$ s, a sudden 2.5-meter waypoint displacement command is injected. This tests the allocator's ability to dynamically switch context between "attitude stabilization" and "positional navigation".
+\end{enumerate}
+\subsubsection{Comparative Survivability and Graceful Degradation}
+The survivability outcomes under these extreme physical constraints are quantitatively summarized in Table \ref{tab:uav}.
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Allocation Scheme          & Scenario A: Severe Wind Hovering & Scenario B: Dynamic Maneuvering \\ \hline
+\textbf{Uniform (Average)} & \xmark\;Crashed at T = 5.2 s           & \xmark\;Crashed at T = 3.3 s          \\ \hline
+\textbf{Static LQR}        & \cmark\;Survived (\textgreater 20.0 s) & \xmark\;Crashed at T = 6.1 s          \\ \hline
+\textbf{DRL (Proposed)} & \cmark\;Survived (\textgreater 20.0 s) & \begin{tabular}[c]{@{}l@{}}\xmark\;Crashed at T = 8.6 s (Extended)\end{tabular} \\ \hline
+\end{tabular}
+\caption{Survival outcomes of the Quadrotor UAV under 24-bit constraint in hostile environments.}
+\label{tab:uav}
+\end{table}
+\noindent\textbf{1. Scenario A: The Emergence of Pragmatic Prioritization}: Under the severe wind conditions of Scenario A, the naive Uniform allocation 
+scheme collapse rapidly (5.2 seconds). Distributing an equal 2 bits across dimension failed to provide the necessary resolution for the critical ($\phi$) and pitch ($\theta$) axes.
+
+Both the Static LQR and the proposed DRL agent successfully maintained stable flight for the full 20-second duration. 
+The Static LQR survived because its predefined, mathematically derived sensitivity formula heavily favored the attitude axes, which perfectly matched the requirements for a stationary hover. 
+However, the DRL agent achieved this exact expert-level prioritization organically. Without any predefined sensitivity matrices, the agent independently discovered the fundamental aerodynamic truth:
+spatial coordinates $(X,Y)$ must be sacrificed to channel bandwidth towards attitude stabilization.
+
+\noindent\textbf{2. Scenario B: Extended Survivability via Dynamic Borrowing}: The true superiority and context-awareness of the DRL framework emerged spectacularly in Scenario B. At $T = 5.0$ s, the sudden 2.5-meter maneuver command fundamentally altered the task dynamics.
+
+The Static LQR, bound by its time-invariant formula, suffered a rapid, catastrophic collapse, crashing at $T=6.1$ s (merely 1.1 seconds after the command). 
+Because the static matrix rigidly starved the $X$ and $Y$ positional axes of bits regardless of the situation, the flight controller was entirely blind to the new waypoint, leading to chaotic acceleration and terminal roll-over.
+
+In sharp contrast, the \textbf{DRL agent demonstrated remarkable Extended Survivability}. Although the ultimate physical limitations 
+of the 24-bit channel inevitably restrict infinite survival during such conflicting demands (high-speed maneuver + strong wind), the DRL agent successfully extended the operational survival window to $T = 8.6$ s, enduring over 3$\times$ longer than the Static LQR post-command.
+
+This extended resilience is attributed to the DRL's \textbf{Context-Aware Dynamic Borrowing capability}. By continuously monitoring the 36-dimensional observation space (which includes real-time tracking errors), the DRL agent dynamically recognized the target displacement.
+It proactively extracted a few bits from the attitude axes to momentarily provide critical positional updates to the $X$-axis, while attempting to balance the aerodynamic stability.
+This intelligent, real-time arbitration proves that the proposed DRL framework transcends rigid mathematical matrices, capable of executing \textit{Graceful Degradation} to dynamically extend system survivability at the absolute limits of Shannon channel capacity.
