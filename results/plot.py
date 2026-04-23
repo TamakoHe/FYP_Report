@@ -35,7 +35,7 @@ ax.plot(r_step, eval_errs,
         markerfacecolor='#FFFFFF',# 标记内部填充白色
         markeredgecolor='#2563EB',# 标记边缘设为线条同色
         markeredgewidth=2,
-        label='RL Model Evaluation Error')
+        label='RL Model Rewards')
 
 # 添加曲线下方的半透明渐变填充效果，提升视觉层次与高级感
 ax.fill_between(r_step, eval_errs, 0, color='#2563EB', alpha=0.1)
@@ -44,10 +44,10 @@ ax.fill_between(r_step, eval_errs, 0, color='#2563EB', alpha=0.1)
 # 4. 图表细节深度美化
 # ==========================================
 # 【修复1】：适当减小字号和 padding，防止标题过度外扩
-ax.set_title('Evaluation Trajectory Errors Over Steps', 
+ax.set_title('Rewards Over Steps', 
              fontsize=14, fontweight='bold', color='#1F2937', pad=12)
 ax.set_xlabel('Steps', fontsize=12, fontweight='bold', color='#4B5563')
-ax.set_ylabel('Trajectory Error (mm)', fontsize=12, fontweight='bold', color='#4B5563')
+ax.set_ylabel('Rewards', fontsize=12, fontweight='bold', color='#4B5563')
 
 # 调整刻度标签颜色与大小
 ax.tick_params(axis='both', which='major', labelsize=11, colors='#6B7280')

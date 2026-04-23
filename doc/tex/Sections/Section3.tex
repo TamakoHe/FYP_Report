@@ -1,189 +1,94 @@
-% TODO: 认真整理一下段落逻辑
-\section{Experiments and Results}
-\subsection{Simulation Experiments and Results Analysis}
-To rigorously validate the proposed Deep Reinforcement Learning (DRL)-driven Joint Communication and Control (JCC) framework,
-comprehensive cyber-physical simulations were conducted. This chapter details the experimental setup, analyzes the training 
-dynamics of the DRL agent, and presents a deep comparative evaluation against traditional allocation heuristic under diverse 
-extreme bandwidth constraints.
-\subsubsection{Simulation Engine and Manipulator Configuration}
-The experiments were deployed utilizing the \textbf{PyBullet} physics engine, which provides high-fidelity, rigid-body kinematic and dynamic simulations at 240 Hz. 
-The physical plant under control is the \textbf{Franka Emika Panda}, an industry-standard 7-DOF robotic manipulator. 
-The robot is initialized near a nomial safe home posture ($q_{home} = [0, -\pi/4, 0, -3\pi/4, 0, \pi/2, \pi/4]^T$) to prevent 
-initial kinematic singularities.
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=\textwidth]{Figures/pybullet.png}
-    \caption{A illustration of a simulated Franka Emika Panda robotic arm by PyBullet}
-\end{figure}
-\subsubsection{Dual-Frequency Decoupling and DPCM Communication Channel}
-A critical innovation in our experimental design is the realistic modeling of the network channel. Traditional simulations often 
-erroneously equate the physical control frequency with the communication frequency, leading to artificial high-frequency quantization 
-chattering (the "Parkinson's effect" in motors). 
+\section{Chapter 3:Cyber-Physical Experiments and Results}
+This chapter presents a comprehensive empirical evaluation of proposed Deep Reinforcement Learning (DRL)-drivern Joint Communication and Control (JCC) 
+framework. A fundamental objective of this study is to demonstrate that proposed intelligent bandwidth allocation strategy is not merely overfitted to a specific 
+robotic configuration, but rather serves as universal, \textbf{cross-morphology generalization framework} capable of addressing extreme communication bottlenecks across diverse cyber-physical paradigms.
 
-To accurately reflect real-world Networked Control Systems (NCS), we implemented a \textbf{Dual-Frequency Decoupling Architecture}:
-\begin{enumerate}
-    \item \textbf{Control Frequency ($f_{ctrl}$)}: The physical engine and local Zero-Order Hold (ZOH) motor drives operate at \textbf{240 Hz}, ensuring smooth torque interpolation.
-    \item \textbf{Communication Frequency ($f_{comm}$)}:  The edge network node transmits quantized Differential Pulse Code Modulation (DPCM) payloads at 10 Hz.
-\end{enumerate}
-Within each 0.1-second communication interval, the maximum physical angular displacement is constrained to $\Delta_{max} = 0.2$ rad, 
-aligning with the hardware velocity limits of the Franka actuators.
-\subsubsection{Evaluation Tasks and Baselines}
-The framework was evaluated on standardized 3D pick-and-place tasks comprising three distinct, randomized trajectories to prevent policy overfitting. 
-Each trajectory consists of reaching a \textbf{Hover Point}, descending to a \textbf{Grasp Point}, and transferring to a \textbf{Placement Point}.
-
-The proposed DRL dynamic allocator is benchmarked against two theoretical baselines:
+To rigorously validate this universality, the experimental methodology is structured around a progressive, tri-fold validation approach:
 \begin{itemize}
-    \item \textbf{Uniform Allocation (Average)}: Evenly distributes bits across all 7 joints.
-    \item \textbf{Static LQR Allocation}: A state-of-the-art mathematical baseline utilizing a static Jacobian sensitivity matrix computed at $q_{home}$ to perform logarithmic water-filling allocation.
+    \item \textbf{High-DOF Fully-Actuated Spatial Allocation}: Utilizing a 7-DOF Franka Emika Panda manipulator to demonstrate the framework's capability to extract maximum spatial precision and execute "graceful degradation" under severe quantization noise.
+    \item \textbf{Underactuated High-Dynamic Survival}: Employing a 12-dimensional Quadrotor UAV simulation subjected to extreme wind disturbances to validate the agent's pragmatic "survival prioritization" capabilities in life-or-death control scenarios.
+    \item \textbf{Sim-to-Real Edge Deployment}: Leveraging a customized 4-DOF physical manipulator and its exact Digital Twin to verify the algorithm's robustness against real-world static friction, unmodeled hardware latency, and asymmetric payload dynamics.
 \end{itemize}
-\subsection{Training Dynamics and Competitive Convergence}
-Training an intelligent agent to optimize bandwidth allocation is highly susceptible to the "Lazy Agent Trap"—where the agent stops exploring once it marginally beats a single baseline. 
-To enforce absolute global optimality, the DRL agent was trained using a \textbf{Competitive Multi-Baseline Reward} for 300,000 steps.
+Through these progressive scenarios, the empirical results will highlight the fundamental limitations of traditional Shannon-separated uniform transmission and static mathematical allocations, 
+ultimately proving the superiority of context-aware dynamic resource scheduling.
+\subsection{Experimental Setup and Implementation Details}
+To comprehensively evaluate the performance and robustness of the JCC architecture, a rigorous multi-stage validation methodology 
+was established. This section outlines the unified configuration of the simulation environments, the physical plants under investigation,
+and the standardized evaluation baselines, ensuring the complete reproducibility of the experiments presented in this chapter.
+\subsubsection{Simulation Engine and DRL Pipeline}
+The primary testbeds for training the reinforcement learning agents and validating the extreme bandwidth constraints were constructed using the PyBullet physics engine. 
+PyBullet was selected due to its highly optimized rigid-body dynamics, accurate collision detection algorithms, and robust support for simulating diverse robotic kinematics. 
+To accurately capture the non-linear physical dynamics and transient tracking errors without introducing artificial simulator stability, the physics engine consistently operates with a base high-frequency control step of 240 Hz.
 
-At each episode, the spatial tracking error ($E_{RL}$) is simultaneously compared against the Uniform error ($E_{avg}$) and the 
-Static LQR error ($E_{static}$). The reward is shaped as a blended competitive advantage:
-\begin{equation}
-    r_t = \text{clip}\Big( (E_{static} - E_{RL}) + 0.5(E_{avg} - E_{RL}), -50, 50 \Big)
-\end{equation}
-\subsubsection{Learning Curve Analysis}
-\begin{figure}[H]
-    \centering
-    \includegraphics{Figures/reward1.png}
-    \caption{The reward learning dynamics over 300k steps under the extreme 14-bit constraint.}
-    \label{fig:reward}
-\end{figure}
-As shown in Figure \ref{fig:reward}, during the initial exploration phase (0-50k steps), the agent receives severe negative rewards, 
-indicating that a random policy performs significantly worse than the mathematical baselines. 
-However, owing to the injection of the \textbf{34-dimensional 3D spatial-awareness vector}, the agent quickly escapes the non-convex local minima.
+Due to the substantial computational overhead required for real-time Forward Kinematics (FK), Jacobian matrix calculations, and dynamic collision detection during the continuous DRL training phase, a multiprocessing vectorized architecture was implemented.
+Utilizing the \inlinecode{SubprocVecEnv} wrapper from the \inlinecode{stable-baselines3} library, the training environments were parallelized 
+across independent, headless PyBullet physics servers on a multi-core CPU. This parallelized paradigm enables the agent to explore 
+hundreds of thousands of complex physical interactions simultaneously, drastically accelerating convergence while preventing the policy from overfitting 
+to a single state trajectory.
 
-Around 150k steps, the reward curve crosses the zero-axis, marking the critical threshold where the neural network definitively surpasses the state-of-the-art static mathematical models. 
-This steady, monotonic rise in the competitive reward demonstrates stable policy improvements without catastrophic forgetting, translating to the ultimate convergence of physical tracking errors to steady-state minimums.
-\subsection{Spatial Domain: Bandwidth Scalability and Robustness}
-\subsubsection{Performance Across Diverse Bandwidth Bottlenecks}
-To evaluate the scalability of the proposed framework, the total available bandwidth ($B_{total}$) was swept from a saturated regime (56 bits)
-down to an extreme survival bottleneck (14 bits). The ultimate task success is evaluated using the \textbf{Steady-State Waypoint Error} at 
-the Grasp and Placement coordinates, completely eliminating dynamic tracking lag to isolate pure quantization precision.
+The intelligent bit-allocation agents across all three scenarios were trained utilizing the Proximal Policy Optimization (PPO) algorithm under an Actor-Critic framework. The critical hyperparameters, tuned to balance exploration and stable trust-region updates, are detailed in 
 \begin{table}[H]
 \centering
-\caption{Quantitative comparison of steady-state Euclidean deviation at critical waypoints across varying total bandwidth constraints ($B_{total}$).}
-\label{tab:bandwidth_scalability}
-% 请确保在文档导言区引入了 \usepackage{booktabs} 和 \usepackage{multirow}
-\begin{tabular}{llcc}
+\caption{Unified PPO Training Hyperparameters for JCC Bandwidth Allocation}
+\label{tab:ppo_hyperparameters}
+\renewcommand{\arraystretch}{1.5} % 增加行间距，使表格看起来更舒适
+\begin{tabular}{@{}llp{8.5cm}@{}}
 \toprule
-\textbf{Total Bandwidth} & \textbf{Allocation Scheme} & \textbf{Grasp Error (mm)} & \textbf{Placement Error (mm)} \\
+\textbf{Hyperparameter} & \textbf{Value} & \textbf{Description} \\
 \midrule
-\multirow{3}{*}{\textbf{14-bit} (Extreme)} 
- & Uniform (Avg) & 27.67 & 32.48 \\
- & Static LQR & 48.85 & 53.43 \\
- & DRL (Proposed) & \textbf{15.65} & \textbf{23.82} \\
-\midrule
-\multirow{3}{*}{\textbf{21-bit} (Severe)} 
- & Uniform (Avg) & 19.50 & 19.32 \\
- & Static LQR & 12.98 & 12.47 \\
- & DRL (Proposed) & \textbf{8.51} & \textbf{11.20} \\
-\midrule
-\multirow{3}{*}{\textbf{28-bit} (Moderate)} 
- & Uniform (Avg) & 8.24 & 7.49 \\
- & Static LQR & 5.83 & 7.28 \\
- & DRL (Proposed) & \textbf{5.18} & \textbf{3.08} \\
-\midrule
-\multirow{3}{*}{\textbf{35-bit}} 
- & Uniform (Avg) & 4.88 & 3.92 \\
- & Static LQR & \textbf{1.70} & 3.17 \\
- & DRL (Proposed) & 2.01 & \textbf{2.27} \\
-\midrule
-\multirow{3}{*}{\textbf{42-bit}} 
- & Uniform (Avg) & 2.75 & 1.69 \\
- & Static LQR & \textbf{1.15} & 2.88 \\
- & DRL (Proposed) & 1.17 & \textbf{1.19} \\
-\midrule
-\multirow{3}{*}{\textbf{56-bit} (Saturated)} 
- & Uniform (Avg) & 0.53 & 0.83 \\
- & Static LQR & 0.58 & 2.21 \\
- & DRL (Proposed) & \textbf{0.45} & \textbf{0.71} \\
+\textbf{Algorithm Framework} & PPO & Actor-Critic architecture for continuous action spaces. \\
+\textbf{Network Architecture} & MLP [256, 256] & High-capacity hidden layers to process spatial coordinates. \\
+\textbf{Total Timesteps} & 300,000 & Sufficient for hard-negative mining and physical stabilization. \\
+\textbf{Learning Rate ($\alpha$)} & $3 \times 10^{-4}$ & Linear schedule decaying to zero for steady-state convergence. \\
+\textbf{Discount Factor ($\gamma$)} & 0.99 & High emphasis on long-term reward maximization. \\
+\textbf{Batch Size} & 64 & Number of experiences used for a single gradient update. \\
+\textbf{Steps per Environment} & 512 & Rollout buffer size before updating the policy. \\
+\textbf{Clip Range ($\epsilon$)} & 0.2 & Prevents destructively large policy updates; linearly decays. \\
 \bottomrule
 \end{tabular}
-\label{tab:bits}
 \end{table}
-The empirical data in Table \ref{tab:bits} reveals a profound non-linear relationship:
+\subsubsection{Target Cyber-Physical Plants}
+To scientifically prove that the proposed framework transcends specific hardware limitations, the evaluations were conducted across three fundamentally different physical plants:
+\begin{itemize}
+    \item \textbf{7-DOF Franka Emika Panda Manipulator}: A high-dimensional, fully-actuated, and kinematically redundant system. This plant is utilized to validate the agent's capacity for extreme spatial precision extraction under severe bandwidth bottlenecks, forcing the algorithm to learn the complex mechanical leverage effect between base and wrist joints.
+    \item \textbf{Quadrotor UAV (12-Dimensional State)}: A classic underactuated and highly unstable dynamic system. Unlike a robotic arm that merely halts upon communication failure, a UAV losing spatial feedback instantly crashes. It is employed to demonstrate the framework's "Survival Prioritization" capability—sacrificing spatial coordinates to guarantee the transmission of critical attitude (roll/pitch) data under extreme wind disturbances.
+    \item \textbf{Custom 4-DOF Manipulator (Digital Twin \& Physical Hardware)}: A cost-effective, resource-constrained edge device. This customized plant serves as the ultimate Sim-to-Real validation testbed. A precise Digital Twin was constructed in PyBullet for pre-training, after which the policy was deployed to the physical hardware to test its robustness against real-world static friction and unmodeled payload dynamics.
+\end{itemize}
+\subsubsection{Baseline Methodologies}
+To benchmark the superiority of the DRL-driven dynamic allocator, two standardized spatial allocation baselines were defined and uniformly applied across all experimental scenarios:
 \begin{enumerate}
-    \item \textbf{The Saturated Regime (42-56 bits)}: When bandwidth is abundant, quantization noise is negligible. All schemes perform exceptionally well ($\text{errors}<2\text{mm}$), and the necessity for complex dynamic allocation is marginal
-    \item \textbf{The Theoretical Validation Regime (21-35 bits)}: As bandwidth tightens, the Static LQR consistently outperforms the Uniform allocation. This validates the classical control theory that prioritizing bits to physically sensitive joints improves overall tracking.
+    \item \textbf{Uniform Allocation (Average)}: A naive, mathematically straightforward baseline that evenly distributes the total available bandwidth ($B_{total}$) across all $n$ control dimensions. While computationally zero-cost, it completely ignores the diverse physical sensitivities of different states, treating a critical base joint exactly the same as a distal wrist joint.
+    \item \textbf{Static LQR-Weighted Allocation}: A state-of-the-art mathematical baseline. It utilizes the infinite-horizon Linear Quadratic Regulator (LQR) cost function and the system's static Jacobian sensitivity matrix (computed at the nominal home posture) to perform logarithmic water-filling bit assignment. While this scheme successfully prioritizes sensitive joints initially, it suffers heavily from "Jacobian Shifting"—its fixed formulas tend to collapse when the highly non-linear system operates far from the pre-calculated home posture.
 \end{enumerate}
-\subsubsection{The Collapse of Static Models at Extreme Bottlenecks (14-bit)}
-The most striking academic discovery occurs at the 14-bit limit (averaging 2bits/joint). Here, the mathematically derived \textbf{Static LQR suffers a catastrophic collapse},
-yielding a massive Grasp Error of 48.85mm, significantly underperforming the naive Uniform allocation (27.67 mm).
+\subsection{Simulation Scenario I: High-DOF Spatial Allocation (Franka Manipulator)}
+To empirically validate the superiority of the proposed Deep Reinforcement Learning (DRL)-driven Joint Communication and Control (JCC) framework, 
+a series of comprehensive simulations were conducted utilizing the high-fidelity PyBullet physical engine. 
+This section systematically evaluates the framework's performance under severe bandwidth constraints, benchmarking the intelligent PPO-based dynamic allocator against traditional uniform allocation and static LQR-weighted allocation strategies on a high-DOF manipulator.
+\subsubsection{Training Convergence and Reward Analysis}
+Before evaluating the final tracking performance of the robotic manipulator, it is imperative to analyze the training dynamics and convergence behavior of the PPO agent. 
+Training a DRL agent within a highly non-linear, rigid-body physics environment presents significant challenges, particularly due to the discontinuous nature of extreme bit quantization and the resulting high-variance physical feedback.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\textwidth]{Figures/reward1.png}
+    \caption{\small{Convergence curve of the PPO agent's competitive reward over 25 evaluation intervals. The curve perfectly illustrates the agent's progression from an initial heavily penalized exploratory phase to a successful algorithmic breakthrough where it surpasses the mathematical baselines, ultimately achieving smooth steady-state convergence.}}
+    \label{fig:reward}
+\end{figure}
+As vividly captured in Figure.~\ref{fig:reward} the training convergence process exhibits a highly stable and monotonic ascent, which profoundly reflects the agent's complex learning behavior. This progression can be analyzed through three distinct phases:
+\begin{itemize}
+    \item \textbf{Initial Exploration and High Penalty Phase (Evaluations 0 to 5)}: In the initial stages of training, the Actor network's weights are randomly initialized, leading to stochastic bandwidth allocation across the 7-DOF joints. Because the agent has not yet learned the mechanical "lever effect" of the manipulator, its random policy performs significantly worse than the predefined Static LQR and Uniform baselines. Consequently, the agent receives a severe competitive penalty, initiating at roughly $-20$. This phase perfectly validates the necessity of the competitive reward shaping; the environment yields consistent, unyielding penalties, coercing the agent to desperately search for a viable gradient out of the sub-optimal allocation trap.
+    \item \textbf{Rapid Ascent and Baseline Breakthrough Phase (Evaluations 5 to 15)}: Following the initial exploratory penalty, the reward curve exhibits a steep and continuous ascent. Driven by the 34-dimensional 3D spatial awareness injection, the PPO agent rapidly discovers the fundamental principle of \textit{Pragmatic Communication}: proactively stripping bits from robust, distal joints to unconditionally secure high-precision transmission for critical base joints. The most critical academic milestone occurs around \textbf{Evaluation 14}, where the reward curve successfully \textbf{crosses the zero-axis ($r>0$)}. In our reward formulation, crossing this threshold mathematically signifies that the DRL agent has officially surpassed the blended tracking performance of both the Static LQR and the Uniform average baselines, transitioning from a sub-optimal novice to a highly intelligent allocator.
+    \item \textbf{Steady-State Convergence Phase (Evaluations 15 to 25)}: After decisively beating the theoretical baselines, the reward continuous to climb and gradually plateaus into a smooth steady-state, stabilizing at an asymptotic maximum of approximately $+2.5$. Notably, the curve exhibits no catastrophic forgetting or violent trust-region oscillations typical of complex continuous control tasks. This perfect, smooth convergence is heavily supported by the linear learning rate scheduling and the clipping mechanism implemented within into the PPO environment. This dynamic scheduling forces the agent to seamlessly transition from aggressive exploration to conservation exploitation, securely "locking in" the learned pragmatic allocation policy for extreme bandwidth scenarios.
+\end{itemize}
+\subsubsection{Spatial Domain: Scalability and Performance under Diverse Constraints}
+Following the verification of the DRL agent's stable convergence, this experiment investigates the core spatial domain performance of the proposed Joint Communication and Control (JCC) framework.
+The primary objective is to evaluate how effectively the intelligent agent arbitrates limited network resources across the 7-DOF manipulator compared to traditional heuristics, and crucially, how this performance scales across different degrees of channel degradation.
 
-This collapse physically proves the fundamental limitation of time-invariant models: \textbf{Jacobian Shifting}. 
-The Static LQR weights are computed at the initial safe posture. 
-When the manipulator stretches outward, its nonlinear kinematics fundamentally alter the sensitivity matrix. 
-The static algorithm rigidly forces bits to joints that are no longer critical, actively sabotaging the end-effector's precision.
+To comprehensively assess scalability and ensure that the RL policy generalizes rather than overfitting to a single maneuver, the evaluations were conducted across \textbf{three distinct pick-and-place trajectories}. The total bandwidth constraint ($B_{total}$) per sampling interval was systematically swept from a saturated regime (56 bits) down to an extreme "survival-level" bottleneck (14 bits).
 
-In stark contrast, the proposed \textbf{DRL agent achieves a commanding Grasp Error of 15.65 mm}. 
-By utilizing its real-time 3D spatial observation, the neural network implicitly acts as a dynamic Jacobian estimator, gracefully degrading the precision of distal wrist joints to secure high-resolution transmission for the heavily loaded base joints.
-\subsection{Ablation Studies and Engineering Considerations}
-To isolate contributions of specifc architectural innovations within our framework, a series of ablation studies were conducted.
-These studies highlight the critical engineering considerations required to bridge the gap between theoretical algorithms and realistic 
-physical simulations.
-\subsubsection{The Necessity of Steady-State Evaluation (Addressing Dynamic Tracking Lag)}
-Initial evaluations of the system measured the continuous tracking error while the manipulator was in full motion. However, this resulted 
-in an artificially inflated baseline error (e.g.,\textasciitilde 120mm) across all allocation schemes, regardless of the available bandwidth.
-
-\textbf{Analysis}: In physical systems, high-inertia motors operating at a decoupled 10 Hz communication rate constantly chase "stale" waypoints,
-creating a massive \textbf{Dynamic Tracking Lag}. If quantization accuracy is measured during this transient phase, the physical inertia completely 
-masks the underlying bit-allocation performance. \textbf{Solution}: By enforcing a 0.5-second \textbf{Settle Phase} (steady-state) at critical waypoints 
-before measuring the error, the physical momentum is nullified. This ablation mathematically isolates the pure quantization noise, proving 
-that traditional continuous-trajectory metrics are fundamentally flawed for evaluating low-frequency Networked Control Systems.
-\subsubsection{The "Seesaw Effect" and 3D Spatial Awareness Injection}
-During early training iterations, the RL agent was provided a standard 28-dimensional state vector (comprising only joint angles and velocities). 
-This led to the \textbf{"Seesaw Effect"}: the agent would achieve excellent precision at Grasp Point but fail catastrophically at the Placement Point.
-
-\textbf{Analysis}: Joint angles are highly abstract. Without explicit Cartesian coordinates, the agent lacks "Spatial Awareness" and fails to semantically differentiate between distinct operational phases (e.g., reaching vs. grasping).
-\textbf{Solution}: By expanding the observation space to \textbf{34 dimensions} (injecting the real-time $X,Y,Z$ coordinates of both the end-effector and the target), 
-the agent gained a comprehensive global spatial awareness. This spatial injection eliminated the Seesaw Effect, allowing the policy to dynamically switch distinct bit-allocation 
-strategies based on its absolute position in the workspace. 
-\subsection{Scenario Two: Underactuated Quadrotor Navigation and Survival}
-To prove that the proposed DRL allocator acts as a universal, 
-paradigm-agnostic JCC framework, a supplementary cyber-physical evaluation was conducted using a Quadrotor UAV. 
-Unlike the fully-actuated mechanical manipulator, which simply halts or deviates when bandwidth is insufficient, an underactuated quadrotor represents a "life-or-death" control scenario where severe quantization noise leads to immediate aerodynamic stalling and catastrophic crashing.
-\subsubsection{Experimental Setup and Extreme Bottleneck}
-The UAV simulation was constructed using the PyBullet physics engine. The total channel capacity was severely choked to a strict $B_{total} = 24$ bits per transmission to carry the 12-dimensional state vector (averaging a mere 2 bits per state). 
-The communication frequency remained decoupled at 10 Hz, while the inner-loop PID flight controller operated at 240 Hz based on the ZOH-reconstructed quantized states.
-
-To comprehensively test the robustness and adaptability of the allocation schemes, the evaluation was divided into two distinct, highly hostile operational scenarios:
-\begin{enumerate}
-    \item \textbf{Scenario A - Severe Wind Hovering (Wind Level: 2.0)}: The UAV is commanded to maintain a stationary hover while being subjected to a continuous, severe wind disturbance. This tests the baseline survival capability.
-    \item \textbf{Scenario B - Dynamic Maneuvering under Strong Wind (Wind Level: 1.5)}: The UAV maintains a hover for the first 5.0 seconds. At exactly $T = 5.0$ s, a sudden 2.5-meter waypoint displacement command is injected. This tests the allocator's ability to dynamically switch context between "attitude stabilization" and "positional navigation".
-\end{enumerate}
-\subsubsection{Comparative Survivability and Graceful Degradation}
-The survivability outcomes under these extreme physical constraints are quantitatively summarized in Table \ref{tab:uav}.
-\begin{table}[H]
-\begin{tabular}{|l|l|l|}
-\hline
-Allocation Scheme          & Scenario A: Severe Wind Hovering & Scenario B: Dynamic Maneuvering \\ \hline
-\textbf{Uniform (Average)} & \xmark\;Crashed at T = 5.2 s           & \xmark\;Crashed at T = 3.3 s          \\ \hline
-\textbf{Static LQR}        & \cmark\;Survived (\textgreater 20.0 s) & \xmark\;Crashed at T = 6.1 s          \\ \hline
-\textbf{DRL (Proposed)} & \cmark\;Survived (\textgreater 20.0 s) & \begin{tabular}[c]{@{}l@{}}\xmark\;Crashed at T = 8.6 s (Extended)\end{tabular} \\ \hline
-\end{tabular}
-\caption{Survival outcomes of the Quadrotor UAV under 24-bit constraint in hostile environments.}
-\label{tab:uav}
-\end{table}
-\noindent\textbf{1. Scenario A: The Emergence of Pragmatic Prioritization}: Under the severe wind conditions of Scenario A, the naive Uniform allocation 
-scheme collapse rapidly (5.2 seconds). Distributing an equal 2 bits across dimension failed to provide the necessary resolution for the critical ($\phi$) and pitch ($\theta$) axes.
-
-Both the Static LQR and the proposed DRL agent successfully maintained stable flight for the full 20-second duration. 
-The Static LQR survived because its predefined, mathematically derived sensitivity formula heavily favored the attitude axes, which perfectly matched the requirements for a stationary hover. 
-However, the DRL agent achieved this exact expert-level prioritization organically. Without any predefined sensitivity matrices, the agent independently discovered the fundamental aerodynamic truth:
-spatial coordinates $(X,Y)$ must be sacrificed to channel bandwidth towards attitude stabilization.
-
-\noindent\textbf{2. Scenario B: Extended Survivability via Dynamic Borrowing}: The true superiority and context-awareness of the DRL framework emerged spectacularly in Scenario B. At $T = 5.0$ s, the sudden 2.5-meter maneuver command fundamentally altered the task dynamics.
-
-The Static LQR, bound by its time-invariant formula, suffered a rapid, catastrophic collapse, crashing at $T=6.1$ s (merely 1.1 seconds after the command). 
-Because the static matrix rigidly starved the $X$ and $Y$ positional axes of bits regardless of the situation, the flight controller was entirely blind to the new waypoint, leading to chaotic acceleration and terminal roll-over.
-
-In sharp contrast, the \textbf{DRL agent demonstrated remarkable Extended Survivability}. Although the ultimate physical limitations 
-of the 24-bit channel inevitably restrict infinite survival during such conflicting demands (high-speed maneuver + strong wind), the DRL agent successfully extended the operational survival window to $T = 8.6$ s, enduring over 3$\times$ longer than the Static LQR post-command.
-
-This extended resilience is attributed to the DRL's \textbf{Context-Aware Dynamic Borrowing capability}. By continuously monitoring the 36-dimensional observation space (which includes real-time tracking errors), the DRL agent dynamically recognized the target displacement.
-It proactively extracted a few bits from the attitude axes to momentarily provide critical positional updates to the $X$-axis, while attempting to balance the aerodynamic stability.
-This intelligent, real-time arbitration proves that the proposed DRL framework transcends rigid mathematical matrices, capable of executing \textit{Graceful Degradation} to dynamically extend system survivability at the absolute limits of Shannon channel capacity.
+The accurately simulate a real-world networked control system (NCS), the communication frequency was decoupled from the high-frequency 
+physical control loop. The control commands were transmitted at 10 Hz over the simulated JCC channel using Differential Pulse Code Modulation (DPCM), while the PyBullet physics engine executed the tracking interpolation at 240 Hz. Three spatial allocation schemes were benchmarked:
+\begin{itemize}
+    \item \textbf{Uniform Allocation (Average)}: A naive baseline that evenly distributes $B_{total}/7$ bits to each joint.
+    \item \textbf{Static LQR-Weighted Allocation}: A mathematically derived baseline utilizing the static Jacobian sensitivity matrix (computed at the home posture) to perform logarithmic water-filling bit assignment.
+    \item \textbf{DRL Dynamic Allocation (Proposed)}: The context-aware PPO agent that continuously redistributes bits based on the real-time 3D spatial observation ($s_t$).
+\end{itemize}
