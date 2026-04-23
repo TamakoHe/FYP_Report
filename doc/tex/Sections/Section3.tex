@@ -60,7 +60,7 @@ To benchmark the superiority of the DRL-driven dynamic allocator, two standardiz
     \item \textbf{Uniform Allocation (Average)}: A naive, mathematically straightforward baseline that evenly distributes the total available bandwidth ($B_{total}$) across all $n$ control dimensions. While computationally zero-cost, it completely ignores the diverse physical sensitivities of different states, treating a critical base joint exactly the same as a distal wrist joint.
     \item \textbf{Static LQR-Weighted Allocation}: A state-of-the-art mathematical baseline. It utilizes the infinite-horizon Linear Quadratic Regulator (LQR) cost function and the system's static Jacobian sensitivity matrix (computed at the nominal home posture) to perform logarithmic water-filling bit assignment. While this scheme successfully prioritizes sensitive joints initially, it suffers heavily from "Jacobian Shifting"—its fixed formulas tend to collapse when the highly non-linear system operates far from the pre-calculated home posture.
 \end{enumerate}
-\subsection{Simulation Scenario I: High-DOF Spatial Allocation (Franka Manipulator)}
+\subsection{Simulation Scenario I: High-DOF Spatial Allocation (Franka Manipulator)}\label{sec:s1}
 To empirically validate the superiority of the proposed Deep Reinforcement Learning (DRL)-driven Joint Communication and Control (JCC) framework, 
 a series of comprehensive simulations were conducted utilizing the high-fidelity PyBullet physical engine. 
 This section systematically evaluates the framework's performance under severe bandwidth constraints, benchmarking the intelligent PPO-based dynamic allocator against traditional uniform allocation and static LQR-weighted allocation strategies on a high-DOF manipulator.
@@ -92,3 +92,124 @@ physical control loop. The control commands were transmitted at 10 Hz over the s
     \item \textbf{Static LQR-Weighted Allocation}: A mathematically derived baseline utilizing the static Jacobian sensitivity matrix (computed at the home posture) to perform logarithmic water-filling bit assignment.
     \item \textbf{DRL Dynamic Allocation (Proposed)}: The context-aware PPO agent that continuously redistributes bits based on the real-time 3D spatial observation ($s_t$).
 \end{itemize}
+\noindent\textbf{1. Task-Oriented Waypoint Accuracy and Error Suppression}
+
+Aligned with the philosophy of \textit{Pragmatic Communication}, the evaluation metric shifts focus from the rigid tracking of continous intermediate 
+trajectories to ultimate \textbf{Task Success}. The tracking performance was quantified by measuring the steady-state 3D Euclidean distance 
+deviation from the Ground Truth (GT) at two critical waypoints: the \textbf{Grasp Point} and the \textbf{Final Placement Point}. The averaged steady-state 
+waypoint errors across the diverse bandwidth constraints are summarized in Table.~\ref{tab:qc}
+
+\begin{table}[H]
+  \centering
+  \renewcommand{\arraystretch}{1.8} % 增加行高以匹配图片中较为宽松的间距
+  \begin{tabular}{llcc}
+    \toprule
+    \textbf{Total Bandwidth} & \textbf{Allocation Scheme} & \textbf{Grasp Error (mm)} & \textbf{Placement Error (mm)} \\
+    \midrule
+    \textbf{14-bit} (Extreme) & Uniform (Avg) & 27.67 & 32.48 \\
+                              & Static LQR    & 48.85 & 53.43 \\
+                              & \textbf{DRL (Proposed)} & \textbf{15.65} & \textbf{23.82} \\
+    \addlinespace
+    \textbf{21-bit} (Severe)  & Uniform (Avg) & 19.50 & 19.32 \\
+                              & Static LQR    & 12.98 & 12.47 \\
+                              & \textbf{DRL (Proposed)} & \textbf{8.51}  & \textbf{11.20} \\
+    \addlinespace
+    \textbf{28-bit} (Moderate)& Uniform (Avg) & 8.24  & 7.49  \\
+                              & Static LQR    & 5.83  & 7.28  \\
+                              & \textbf{DRL (Proposed)} & \textbf{5.18}  & \textbf{3.08}  \\
+    \addlinespace
+    \textbf{56-bit} (Saturated)& Uniform (Avg) & 0.53  & 0.83  \\
+                              & Static LQR    & 0.58  & 2.21  \\
+                              & \textbf{DRL (Proposed)} & \textbf{0.45}  & \textbf{0.71}  \\
+    \bottomrule
+  \end{tabular}
+  \caption{Quantitative comparison of the steady-state Euclidean deviation at critical waypoints across varying total bandwidth constraints ($B_{total}$).}
+  \label{tab:qc}
+\end{table}
+As depicted in Tabel.~\ref{tab:qc}, the scalability test reveals a fascinating, highly non-linear relations between network constraints and spatial control performance, perfectly highlighting the limitations of traditional mathematical approaches.
+
+\noindent\textbf{The Saturated Regime (56-bit)}: When network resources are abundant, providing an average of 8 bits per joint, quantization noise becomes 
+negligible. All three allocation schemes reliably guide the end-effector to the target waypoints with sub-millimeter precision. In this regime, 
+the sophisticated dynamic allocation offers only marginal gains over a naive uniform distribution.
+
+\noindent\textbf{The Extreme Bottleneck and the Collapse of Static Models (14-bit)}: The most critical academic observation occurs at the 14-bit limit (averaging merely 2 bits per joint). 
+Here, the mathematically sophisticated \textbf{Static LQR allocation exhibits a catastrophic failure}, yielding a massive Grasp Error of 48.85 mm--significantly 
+worse than even the naive Uniform baseline (27.67 mm). This physical deviation far exceeds the tolerance of a standard robotic parallel gripper, guaranteeing a severe collision or a complete miss.
+
+This phenomenon uncovers a fatal flaw in traditional time-invariant mathematical models: the Jacobian sensitivity matrix is highly state-dependent. The Static LQR weights were computed at the initial safe "home posture". 
+However, when the manipulator stretches out to a distant grasp coordinate, its physical kinematics and non-linear leverage change completely. The Static LQR rigidly forces bits to joints that are no longer the most sensitive in this new posture, thereby actively sabotaging the system.
+\noindent\textbf{2. Spatial Awareness and Graceful Degradation}
+In stark contrast to the static baseline's collapse, the proposed \textbf{DRL dynamic allocator demonstrates absolute dominance} under the 14-bit constraint, compressing the Grasp Error to an impressive \textbf{15.65 mm} and the Placement Error to \textbf{23.82 mm}.
+
+This superiority stems from the injection of 3D spatial awareness into the DRL's observation space. Unlike the rigid formula, the PPO agent 
+ingests a 34-dimensional state vector that includes the real-time 3D coordinates of the end-effector and the target. Consequently, the neural 
+network implicitly learns to compute the real-time Jacobian matrix.
+
+When operating at the edge of the manipulator's workspace, the agent acts pragmatically: it deliberately starves the distal wrist joints to the absolute minimum limit of 1 bit, absorbing the resulting local quantization noise to accumulate enough bandwidth "currency" to secure 4 to 5 bits for the heavily loaded proximal joints. 
+This phenomenon embodies the concept of graceful degradation. By proactively sacrificing low-sensitivity components based on real-time spatial context to guarantee high-precision transmission for critical links, the DRL allocator successfully navigates extreme network starvation.
+\subsection{Simulation Scenario II: Underactuated Survival (Quadrotor UAV)}
+To rigorously prove that the proposed DRL allocator acts as a universal, paradigm-agnostic JCC framework, a supplementary cyber-physical 
+evaluation was conducted using a Quadrotor Unmanned Aerial Vehicle (UAV). Unlike the fully-actuated mechanical manipulator discussed in Section~\ref{sec:s1}--which simply halts or experiences steady-state 
+deviations when bandwidth is insufficient--an underactuated quadrotor represents a strict "life-or-death" control scenario.
+In such systems, severe quantization noise does not merely reduce precision; it leads to immediate aerodynamic stalling, loss of 
+attitude control, and catastrophic crashing.
+\subsubsection{Experimental Setup and the 24-Bit Extreme Bottleneck}
+The UAV simulation was constructed using PyBullet physics engine. The state space of the quadrotor is represented by a 12-dimensional 
+vector encompassing 3D positions, Euler angles (roll, pitch, yaw), and their respective linear and angular velocities.
+
+To push the allocation algorithms to their absolute operational limits, the total channel capacity was severely choked to a strict $B_{total}=24$ 
+bits per transmission (averaging a mere 2 bits). The communication frequency remained decoupled at 10 Hz over the JCC network, while the inner-loop 
+PID flight controller operated at 240 Hz based on the Zero-Order Hold (ZOH) reconstructed quantized states.
+
+To comprehensively test the robustness and context-adaptability of the allocation schemes, the evaluation was divided into two distinct,
+highly hostile operational scenarios:
+\begin{itemize}
+    \item \textbf{Scenario A - Severe Wind Hovering (Wind Level: 2.0)}: The UAV is commanded to maintain a stationary hover while being subjected to a continuous, severe wind disturbance. This scenario tests the baseline physical survival capability under static spatial demands.
+    \item \textbf{Scenario B - Dynamic Maneuvering under Strong Wind (Wind Level: 1.5)}: The UAV is commanded to maintain a hover for the first 5.0 seconds. At exactly $T = 5.0$ s, a sudden 2.5-meter waypoint displacement command is injected into the network. This evaluates the allocator's ability to dynamically switch semantic context between "attitude stabilization" and "positional navigation" under extreme duress.
+\end{itemize}
+\subsubsection{Extended Survivability and Graceful Degradation}
+The survivability outcomes under these extreme cyber-physical constraints are quantitatively summarized in Table.~\ref{tab:uav}.
+
+\begin{table}[H]
+  \centering
+  \footnotesize
+  \renewcommand{\arraystretch}{1.8}
+  \caption{Quantitative survival outcomes of the Quadrotor UAV under the 24-bit constraint in hostile environments. The DRL agent demonstrates equivalent performance in static hovering and significantly extends the survival window during dynamic maneuvering.}
+  \begin{tabular}{lll}
+    \toprule
+    \textbf{Allocation Scheme} & \textbf{Scenario A: Severe Wind Hovering} & \textbf{Scenario B: Dynamic Maneuvering} \\
+    \midrule
+    Uniform (Average)       & \xmark Crashed at T = 5.2 s           & \xmark Crashed at T = 3.3 s          \\
+    Static LQR              & \cmark Survived (\textgreater 20.0 s) & \xmark Crashed at T = 6.1  s (Survived 1.1s post-command)         \\
+    \textbf{DRL (Proposed)} & \cmark Survived (\textgreater 20.0 s) & \begin{tabular}[c]{@{}l@{}}\xmark Crashed at T = 8.6 s (\textbf{Survived 3.6s post-command}) \end{tabular} \\
+    \bottomrule
+  \end{tabular}
+  \label{tab:uav}
+\end{table}
+\noindent\textbf{1. Scenario A: The Emergence of Pragmatic Prioritization}
+
+Under the severe wind conditions of Scenario A, the naive Uniform allocation scheme collapsed rapidly, crashing at $T=5.2$ seconds.
+Distributing an equal 2 bits across all 12 dimensions failed to provide the necessary tracking resolution for critical roll ($\phi$) and pitch ($\theta$) 
+axes, causing the internal PID controller to output erratic motor torques.
+
+In contrast, both the Static LQR and the proposed DRL agent successfully maintained stable flight for the full 20-seconds evaluation 
+duration. The Static LQR survived because its predefined, mathematically derived sensitivity formula heavily favored the attitude axes, which perfectly matched the requirements for a stationary, wind-resisting hover.
+However, the DRL agent achieved this exact expert-level prioritization organically. Without relying on predefined sensitivity matrices, the PPO agent independently discovered the fundamental aerodynamic truth: absolute spatial coordinates ($X, Y$) must be deliberately starved of bandwidth to channel life-saving bits toward high-frequency attitude stabilization.
+
+\noindent\textbf{2. Scenario B: Extended Survivability via Dynamic Borrowing}
+
+The true superiority and context-awareness of the DRL framework emerged spectacularly during Scenario B. At $T = 5.0$ seconds, 
+the sudden 2.5-meter maneuver command fundamentally altered the task dynamics, exposing the fatal flaw of rigid mathematical allocations.
+
+In sharp contrast, the \textbf{DRL agent demonstrated remarkable Extended Survivability}. While the ultimate physical limitations 
+of the 24-bit channel inevitably restrict infinite survival during such conflicting demands (executing a high-speed maneuver while flighting strong wind),
+the DRL agent successfully extended the operational survival window to $T=8.6$ seconds, enduring $3\times$ longer than the Static LQR post-command.
+
+This extended resilience is directly attributed to the DRL's \textbf{Context-Aware Dynamic Borrowing} capability. By continuously monitoring the observation 
+space (which inherently includes real-time tracking errors), the DRL agent dynamically recognized the massive target displacement at $T = 5.0$ s. 
+Instead of stubbornly holding the hovering strategy, it proactively extracted a few bits from the attitude axes to momentarily provide critical positional updates to the $X$-axis, while desperately attempting to balance aerodynamic stability.
+
+This intelligent, real-time arbitration proves that the proposed DRL framework transcends rigid mathematical matrices. It is capable of 
+executing \textit{Graceful Degradation}--squeezing out the absolute maximum utility from the Shannon channel capacity to extend the physical system's life,
+a capability vital for emergency fail-safes in real-world autonomous systems.
+
