@@ -1,0 +1,156 @@
+\section{System Modeling and Methodology}
+The foundation of addressing communication bottlenecks in Networked Control Systems (NCS) lines in in accurately modeling the interplay between 
+the physical plant dynamics and the digital communication infrastructure. This chapter establishes the rigorous mathematical models and introduces 
+the proposed Deep Reinforcement Learning (DRL)-driven Joint Communication and Control (JCC) methodology.
+\subsection{Overall System Architecture and Cyber-Physical Modeling}
+\subsubsection{Networked Control System Architecture}
+The proposed NCS architecture comprises a closed-loop cyber-physical pipeline encompassing sensors, a bandwidth-limited communication channel, a remote controller, and physical actuators. 
+Unlike traditional tethered robots with dedicated point-to-point analog connections, the sensory and control data in this modern architecture must traverse a shared, bandwidth-limited communication medium.
+
+To accurately mirror real-world industrial networks and mitigate the severe "tracking lag" inherent in physical actuators, our architecture explicitly implements 
+a \textbf{Dual-Frequency Decoupling} paradigm. The communication frequency $f_{comm}$(e.g., 10 Hz) is structurally decoupled from the high-frequency physical control loop $f_{ctrl}$ (e.g., 240 Hz).
+This ensures that control commands are transmitted pragmatically over the network, while the local motor drives execute smooth Zero-Order Hold (ZOH) interpolations between received waypoints, preventing hardware-damaging torque spikes and high-frequency quantization chattering.
+
+%% TODO: 加入图表
+%% 这是一个大图 [图 3.1: 联合通信与控制系统 (JCC) 总体信息流架构图] (建议使用全页宽度的流程图，展示数据从真实传感器采集、边缘计算节点执行 ETC 判定与压缩、无线传输到接收端解压、控制电机输出的全过程)。
+\subsubsection{Physical Plant Dynamics}
+To derive control-oridented communication strategies, a rigorous mathematical model of the physical plant is required.\\
+
+\noindent\textbf{Robotic Manipulator Dynamic}:\\
+The continuous-time rigid-body dynamics of an $n$-degree-of-freedom (DOF) robotic manipulator (where $n = 7$ for our specific Franka Emika configuration) can be described by the following nonlinear second-order differential equation:
+\begin{equation}
+    M(q)\ddot{q} + C(q,\dot{q})\dot{q} + G(q) = \tau
+\end{equation}
+where:
+\begin{itemize}
+    \item $q, \dot{q}, \ddot{q} \in \mathbb{R}^n$ represent the vectors of joint angles, angular velocities, and angular accelerations, respectively.
+    \item $M(q) \in \mathbb{R}^{n \times n}$ is the symmetric, positive-definite inertial matrix.
+    \item $C(q, \dot{q}) \in \mathbb{R}^{n \times n}$ represents the  Coriolis and centrifugal force matrix.
+    \item $G(q) \in \mathbb{R}^n$ is the gravity loading vector.
+    \item $\tau \in \mathbb{R}^n$ is the vector of control torques applied by the actuators.
+\end{itemize}
+To transform this into a standard state-space representation, let the system state vector be defined as $x(t) = [q(t)^T, \dot{q}(t)^T]^T \in \mathbb{R}^{2n}$,
+and the control input as $u(t)=\tau(t)\in\mathbb{R}^n$. The nonlinear dynamics can be rewritten as $u(t) = \tau(t) \in \mathbb{R}^n$.
+The nonlinear dynamics can be rewritten as a first-order ordinary differential equation $\dot{x}(t) = f(x(t), u(t))$:
+\begin{equation}
+    \dot{x}(t) = \frac{d}{dt} \begin{bmatrix} q \\ \dot{q} \end{bmatrix} = \begin{bmatrix} \dot{q} \\ M(q)^{-1}(\tau - C(q,\dot{q})\dot{q} - G(q)) \end{bmatrix}
+\end{equation}
+For advanced linear control methodologies (such as LQR) and sensitivity analysis, this nonlinear model is linearized around a nominal 
+operating trajectory or equilibrium point $(x_e,u_e)$. Using Jacobian linearization, the continuous-time linear time-invariant (LTI) model is 
+obtained, which is subsequently using a fixed sampling period $T_s$ to yield the discrete-time state-space model:
+\begin{equation}
+    x_{k+1}=Ax_k+Bu_k+w_k
+\end{equation}
+where $x_k \in \mathbb{R}^{2n}$ is the discrete state at time step $k$,$u_k \in \mathbb{R}^n$ is the discrete control input, and 
+$w_k \in \mathbb{R}^{2n}$ represents the additive process noise (e.g., modeling inaccuracies and physical disturbances), assumed to be 
+zero-mean Gaussian noise with covariance $W$.
+Physically, matrix $A$ captures the system's inertia and internal state couping, while matrix $B$ maps the applied actuator torques 
+to the resulting state transitions.\\
+
+\noindent\textbf{Quadrotor UAV Dynamics}
+
+To rigorously demonstrate the universality of the proposed JCC framework across diverse physical paradigms, a quadrotor Unmanned 
+Aerial Vehicle (UAV) is modeled alongside the fully-actuated manipulator. The quadrotor is a classic it possesses 6 degrees of freedom but is controlled by only 4 independent inputs (one total thrust and three torques).
+
+The state space of the quadrotor is represented by a 12-dimensional vector:
+\begin{equation}
+    x = [p^T, v^T, \Theta^T, \omega^T]^T \in \mathbb{R}^{12}
+\end{equation}
+where $p=[x,y,z]^T$ is the inertial position, $v=[\dot{x}, \dot{y}, \dot{z}]^T$ is the linear velocity, $\Theta = [\phi, \theta, \psi]^T$ represents the Euler angles (roll, pitch, yaw), and $\omega = [p, q, r]^T$ denotes the body-frame angular velocities.
+
+Using the Newton-Euler formalism, the rigid-body dynamics are governed by:
+\begin{align}
+    \ddot{p} &= -g \mathbf{e}_3 + \frac{T}{m} R \mathbf{e}_3 - \frac{1}{m} F_{drag} \\
+    \dot{\omega} &= J^{-1} (\tau - \omega \times J \omega)
+\end{align}
+where $m$ is the mass, $g$ is gravity, $J$ is the inertia matrix, $R$ is the rotation matrix from body to inertial frame, $T$ is the total collective thrust,
+$\tau \in \mathbb{R}^3$ represents the control torques, and $F_{drag}$ denotes external aerodynamic disturbances (e.g., wind gusts).
+
+In a severely bandwidth-constrained NCS, the underactuated nature of the UAV poses a critical survival challenge: 
+quantization errors in the attitude states ($\phi, \theta$) will instantly lead to misdirected thrust vectors, causing unrecoverable catastrophic crashes, 
+whereas errors in translational positions ($x, y$) merely result in tolerable drifting.
+\subsubsection{Bandwidth-Limited Communication Network Model}
+The critical constraint in this thesis is the extreme limitation of the communication channel. 
+Let the network capacity limit be strictly defined as a maximum allowed budget of $B_{total}$ bits per sampling interval $T_s$. 
+Let $b_{i,k}$ denote the number of bits allocated to the $i$-th element of the state vector. The resource constraint mandates that $\sum b_{i,k} \le B_{total}$.
+
+Transmitting the absolute state $x_k$ under extreme bit constraints (e.g., averaging 2 bits per joint) directly introduces catastrophic quantization noise. 
+For a robotic manipulator, a 2-bit representation of a full $360^\circ$ joint rotation causes massive, non-linear physical "chattering" and triggers kinematic singularity explosions.
+
+To systematically resolve this, the proposed architecture introduces \textbf{Differential Pulse Code Modulation (DPCM)}. Instead of the absolute 
+position, the edge node calculates the state increment within the specific communication interval:
+\begin{equation}
+    \Delta x_k = x_k - \hat{x}_{k-1}
+\end{equation}
+
+The transmitted payload is the quantized delta: $\Delta x_k^q = \mathcal{Q}(\Delta x_k, b_k)$, where $\mathcal{Q}(\cdot)$ maps the continuous delta into discrete quantization levels bounded by a maximum physical kinematic window $\Delta_{max}$ (e.g., $0.2$ rad per 0.1s communication step).
+
+At the controller side, a Zero-Order Hold (ZOH) updates the estimated remote state $\hat{x_k}$ incorporating the Event-Triggered decision variable 
+$\gamma_k\in\{0,1\}$:
+\begin{equation}
+    \hat{x}_k = \gamma_k (\hat{x}_{k-1} + \Delta x_k^q) + (1 - \gamma_k) \hat{x}_{k-1}
+\end{equation}
+This equation powerfully unifies the temporal-spatial interplay: If $\gamma_k=1$, the spatial quantizer $\mathcal{Q}(\cdot)$ determines the precision of the payload. 
+If $\gamma_k=0$, zero bits are transmitted, heavily saving bandwidth.
+\subsection{Temporal-Spatial Baseline Methodologies}
+\subsubsection{Temporal Domain: Event-Triggered Control (ETC) Mechanism}
+To aggressively truncate redundant transmissions in the temporal domain, an Event-Triggered Control (ETC) mechanism is deployed. 
+Under traditional Time-Triggered Control (TTC), the sensor broadcasts data even when the manipulator is at a stable equilibrium, squandering channel capacity.
+
+The ETC logic continuously evaluates the measurement error $e_k = x_k - \hat{x}_k$. 
+A transmission is triggered ($\gamma_k = 1$) if and only if the norm of the error exceeds a predefined safety threshold $\delta$:
+\begin{equation}
+    ||e_k||_2 > \delta
+\end{equation}
+Based on Input-to-State Stability (ISS) properties and Lyapunov stability theory, the Lyapunov difference $\Delta V = V(x_{k+1}) - V(x_k)$ is bounded by $\Delta V \le -\alpha(||x_k||) + \beta(||e_k||)$. 
+As long as the error $e_k$ is tightly bounded by the absolute threshold $\delta$, the asymptotic stability of the robotic manipulator is mathematically guaranteed.
+\subsubsection{Spatial Domain: Static LQR-Weighted Data Compression}
+When transmission is triggered, the limited $B_{total}$ must be optimally allocated across the $n$ joints. A theoretical baseline utilizes the infinite-horizon Linear Quadratic Regulator (LQR) cost function. 
+By solving the Discrete Algebraic Riccati Equation (DARE), the system extracts the Hessian sensitivity matrix $P$. According to rate-distortion theory, the optimal bit allocation $b_i$ is formulated via logarithmic water-filling:
+\begin{equation}
+    b_i = \frac{B_{total}}{n} + \frac{1}{2} \log_2 \left( \frac{P_{ii} \sigma_i^2}{\left( \prod_{j=1}^n P_{jj} \sigma_j^2 \right)^{1/n}} \right)
+\end{equation}
+This static allocation improves control resilience by stripping bits from mathematically less sensitive joints. 
+However, in real-world highly nonlinear kinematics, the true sensitivity of a joint is state-dependent and fluctuates drastically. 
+To achieve true pragmatic context-awareness, the system must transition from static matrix formulations to dynamic, learning-based arbitration.
+\subsection{Deep Reinforcement Learning for Pragmatic Communication}
+To overcome the inherent rigidity of the static LQR formula, the bandwidth allocation problem is redefined as a Markov Decision Process (MDP) and solved using Deep Reinforcement Learning (DRL).
+\subsubsection{MDP Formulation and Structural Innovations}
+\noindent\textbf{1. 34-Dimensional Spatial-Aware Observation Space $\mathcal{S}$}: Relying solely on joint angular metrics deprives the agent of 3D spatial awareness, inevitably leading to a "seesaw effect" (e.g., optimizing for grasping while failing at placement) due to the lack of absolute positional context. To grant the agent a comprehensive "God's-eye view" of the operational workspace, the observation $s_t\in\mathcal{S}$ is drastically expanded to a 34-dimensional continuous vector:
+\begin{equation}
+    s_t = \Big[ q_t^T, \ \dot{q}_t^T, \ q_{target, t}^T, \ (q_t - q_{target, t})^T, \ p_t^T, \ p_{target, t}^T \Big]^T \in \mathbb{R}^{34}
+\end{equation}
+where $p_t, p_{target, t} \in \mathbb{R}^3$ represent the real-time 3D Cartesian coordinates of the end-effector and the target. 
+This spatial injection is paramount; it allows the neural network to implicitly compute real-time nonlinear Jacobian transformations and accurately identify semantic task phases.
+\noindent\textbf{2. Action Space $\mathcal{A}$ and Discrete Bit Mapping}: The policy network outputs a continuous action vector $a_t \in [-1, 1]^7$. Since physical network protocols necessitate discrete integer constraints $\sum b_{i,t} = B_{total}$, a deterministic Softmax mapping layer is applied:
+\begin{equation}
+    w_i = \frac{\exp(a_{i,t})}{\sum_{j=1}^7 \exp(a_{j,t})}
+\end{equation}
+The remaining bits are distributed proportionally: $b_{float, i} = b_{min} + w_i \times (B_{total} - 7 \times b_{min})$. 
+The values are rounded to $b_i=\lfloor b_{float, i} \rfloor$, and fractional remainders are iteratively reassigned. This guarantees strict resource constraint compliance while preserving a differentiable landscape for backpropagation.
+\noindent\textbf{3. Competitive Multi-Baseline Reward Shaping $\mathcal{R}$}: If the DRL agent is rewarded merely for outperforming a single static baseline, it frequently falls into the "Lazy Agent Trap"—ceasing exploration once marginal superiority is achieved. To enforce absolute spatial dominance across all waypoints, 
+a \textbf{Competitive Multi-Baseline Reward} mechanism is innovated.
+
+At each communication step, the simulation computes the true physical Euclidean tracking error of the DRL allocation ($E_{RL}$), 
+alongside two parallel universe tracking evaluations: the Uniform allocation error ($E_{avg}$) and the Static LQR allocation error ($E_{static}$). The reward $r_t$ is formulated as a smooth, blended competitive advantage:
+\begin{equation}
+    r_t = \text{clip}\Big( (E_{static} - E_{RL}) + \lambda (E_{avg} - E_{RL}), \ -C, \ C \Big)
+\end{equation}
+Setting the blending factor $\lambda = 0.5$ compels the agent to simultaneously conquer the mathematical rigidity of the static LQR and the flat mediocrity of the uniform baseline. 
+The aggressive clipping bound $C = 50.0$ applies substantial mathematical penalty for suboptimal performance, preventing catastrophic forgetting during complex spatial maneuvers.
+\subsubsection{PPO Algorithm and High-Capacity Architecture}
+Given the continuous action space the necessity for monotonic convergence under complex physical feedback, the Proximal Policy Optimization (PPO) 
+algorithm is selected. PPO defines a clipped surrogate objective function to maximize policy updates stably:
+\begin{equation}
+    L^{CLIP}(\theta) = \mathbb{E}_t \left[ \min\left( r_t(\theta)\hat{A}_t, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t \right) \right]
+\end{equation}
+To effectively process the expanded 34-dimensional spatial-aware observation vector, the Actor-Critic neural networks were upgraded to high-capacity Multilayer Perceptrons (MLPs). 
+Both the policy and value networks utilize two deep hidden layers of 256 neurons each, activated by ReLU functions, providing immense representational power for nonlinear kinematic mapping.
+\subsubsection{Workspace-Focused Domain Randomization}
+Standard DRL paradigms typically initialize states randomly across the entire theoretical state space. 
+For a 7-DOF manipulator, this causes severe domain shift, wasting computational resources on highly distorted, unreachable singular postures that are irrelevant to industrial tasks.
+
+To massively accelerate convergence and ensure flawless precision at operational waypoints, a \textbf{Workspace-Focused Domain Randomization} 
+strategy was implemented. During \inlinecode{reset()} phase, the manipulator is initialized with bounded noise strictly 
+within the vicinity of the nominal safe home posture ($HOME\_Q \pm 1.5$ rad).
+This strategic constraint ensures the neural network focuses 100\% of its learning capacity on mastering pragmatic bandwidth squeezing specifically within the functional pick-and-place workspace, ultimately unlocking the extreme performance showcased in the experimental evaluations.
