@@ -41,5 +41,56 @@ redirecting bit-flow to the exact joints that require high-resolution interventi
 Bridging the "Sim-to-Real" gap is arguably the most formidable challenge in deploying DRL algorithms to physical hardware. The experiments 
 conducted on the Digital Twin explicitly addressed critical engineering phenomena that are often glossed over purely theoretical JCC literature.
 \subsubsection{Soft-Servo Dynamics and Hardware Jitter}
+In theoretical simulations, motors are often treate as ideal actuators capable of infinite instantaneous torque. If 1-bit quantized 
+step signals are fed into such ideal actuators, the physics solver guarantees reaching the target, albeit with mathematical oscillation. 
+However, deploying a 1-bit (two-state) step signal to a real-world edge IoT actuator (e.g., a low-cost PWM servo) induces destructive high-frequency 
+mechanical chattering, rapid thermal degradation, and gear failure.
 
-\section{}
+To rigorously address this, the Digital Twin simulation actively modeled cheap actuator compliance by injecting realistic soft-servo dynamics ($Force=2.5, PositionGain=0.05$). 
+The experimental results confirmed that the DRL allocation's policy of \textit{Graceful Degradation} naturally protects hardware integrity. 
+By dynamically securing higher bit-depths (4 to 5 bits) for massive, high-inertia base joints, the agent suppressed destructive low-inertia distal 
+joints, whose minor oscillations are far less damaging to the overall mechanical structure.
+\subsubsection{The Micro-Interpolation Safety Layer}
+Furthermore, the implementation of the Dual-Frequency Decoupling architecture ($f_{comm} = 10 \text{ Hz}, f_{ctrl} = 240 \text{ Hz}$)
+validates a highly pragmatic deployment paradigm for edge robotics. The framework necessitates a local Micro-Interpolation Safety Layer 
+(typically a Zero-Order Hold or Spline Interpolator running on a local edge microcontroller). This layer locally smooths the drastically 
+architectural design proves that extreme bandwidth compression is safely achievable in real industrial setups without triggering torque-derivative 
+safety faults on robotic interfaces like the Franka Control Interface (FCI).
+\subsection{Limitations and Boundaries of the Proposed Framework}
+While the DRL-driven JCC architecture exhibits significant advantages, maintaining objective academic rigor requires acknowledging 
+its inherent limitations and boundaries.
+
+\begin{enumerate}
+    \item \textbf{Assumption of Deterministic Network Latency}: The current MDP formulation and training environment assume that while bandwidth is severely restricted, the network latency (delay) remains constant and deterministic.
+          In real-world wireless environments (e.g., 5G/Wi-Fi), extreme congestion often introduces stochastic packet drops and varying transmission delays. If a heavily compressed packet containing critical base-joint updates is dropped or delayed, the current DRL agent lacks a temporal fallback mechanism, which could lead to momentary loss of control.
+    \item \textbf{Computational Overhead of DRL Inference}: Although the DRL agent reduces the network communication payload, it transfers the computational burden to the Edge/Cloud servers. 
+           Executing the MLP policy network inference at every communication step requires dedicated computational resources (e.g., GPUs or specialized NPUs). For ultra-low-power edge scenarios where even minimal neural network inference is too costly, deploying this framework might be challenging compared to the computationally zero-cost Uniform allocation.
+    \item \textbf{Requirement for Full State Observability}: The agent's "spatial awareness" relies heavily on the continuous availability of a high-dimensional observation vector (e.g., precise joint positions, velocities, and tracking errors). In physically degraded environments where local encoders malfunction or visual tracking is occluded, the agent's observation space would be corrupted. Unlike traditional robust control models (e.g., $H_\infty$ control) 
+          that mathematically bound uncertainties, the DRL policy might exhibit unpredictable out-of-distribution (OOD) behaviors when fed corrupted spatial states.
+\end{enumerate}
+\subsection{Future Work and Extensions}
+Building upon the foundations established in this thesis, several promising avenues for future research can be identified to further mature 
+the JCC paradigm:
+\begin{itemize}
+    \item \textbf{Stochastic Delay and Packet Loss Integration}: Future iterations of the PyBullet training environment should explicitly model variable 
+          network latency and random packet dropouts. Upgrading the PPO architecture with Recurrent Neural Networks (RNNs), such as LSTMs or Transformers, would endow the agent with a "memory" of past network states, allowing it to predict and proactively compensate for impending network blackouts.
+    \item \textbf{Multi-Agent JCC via Federated Learning}: In large-scale industrial IoT settings (e.g., warehouse swarm robotics), multiple robots compete for the same shared bandwidth pool. Extending this framework to a Multi-Agent Reinforcement Learning (MARL) paradigm could enable cooperative bandwidth sharing, where robots actively yield bandwidth sharing, where robots actively yield bandwidth to peers executing more critical or sensitive maneuvers.
+    \item \textbf{Dynamic ETC Thresholding}: Currently, the Event-Triggered Control (ETC) threshold $\delta$ is a predefined hyperparameter. Future research could allow the DRL agent to output $\delta$ as a secondary action alongside the bit allocation, enabling it to dynamically dictate when to communicate based on real-time task urgency, thus achieving the ultimate unification of temporal and spatial compression.
+\end{itemize}
+\section{Conclusion}
+This thesis has systematically investigated the critical challenge of control data exchange in bandwidth-starved Networked Control Systems (NCS). 
+Traditional communication paradigms, heavily rooted in Shannon's separation principle, blindly optimize for data fidelity through uniform compression, thereby ignoring the underlying physical semantics of the robotic systems they serve. 
+To overcome this fundamental limitation, we proposed an intelligent, Deep Reinforcement Learning (DRL)-driven Joint Communication and Control (JCC) framework. By uniting an Event-Triggered Control (ETC) mechanism in the temporal domain with a Proximal Policy Optimization (PPO) agent for dynamic bit allocation in the spatial domain, the framework effectively operationalizes the concept of Pragmatic Communication—transmitting only what is physically necessary, precisely when and where it is needed most.
+
+The empirical validation across diverse cyber-physical paradigms demonstrated the profound superiority of this context-aware approach over rigid mathematical baselines. 
+In high-dimensional fully-actuated tasks utilizing the 7-DOF Franka Emika manipulator, the DRL allocator successfully pierced the mathematical performance ceiling of static Linear Quadratic Regulator (LQR) designs. 
+Under an extreme 14-bit communication bottleneck, it elegantly resolved the fatal issue of "Jacobian Shifting" by effectively starving distal joints to protect massive base linkages, thereby minimizing spatial grasping errors. Furthermore, in the underactuated Quadrotor UAV scenario, the agent organically learned an aerodynamic survival strategy. By proactively sacrificing absolute positional accuracy to maintain high-frequency attitude stabilization, the DRL framework significantly extended the operational survival window against severe environmental wind disturbances and aggressive dynamic maneuvering.
+
+The ultimate validation of the framework's real-world deployability was conducted via a high-fidelity Digital Twin stress test of a resource-constrained 5-DOF edge manipulator. 
+Subjected to a composite crisis of unmodeled base tilt and a sudden 0.8 kg dynamic payload drop, the traditional static allocation algorithms suffered from noticeable physical sagging due to their time-invariant, empty-load assumptions. 
+In stark contrast, the DRL agent, equipped with a comprehensive 21-dimensional spatial-aware observation space, implicitly detected the gravitational torque deficiency. It executed real-time graceful degradation by dynamically reclaiming bits from the wrist to pump ultra-high-resolution control signals into the failing shoulder joint. Alongside the implementation of a Micro-Interpolation Safety Layer, this adaptive response ensured that severe bit starvation did not translate into hardware-damaging mechanical jitter, successfully bridging the critical Sim-to-Real gap.
+
+In conclusion, this research confirms that in extreme IoT edge environments, adaptive resource arbitration is paramount. 
+The intelligent JCC framework drastically reduces the overall network payload while maintaining—and in critical stress cases, rescuing—the stability and precision of the physical plant. 
+Looking forward, as cyber-physical systems scale into complex multi-agent swarms with stochastic network delays, extending this framework to dynamically dictate both the spatial bit allocation and the temporal ETC thresholds simultaneously will mark the ultimate unification of communication and control. 
+The theoretical insights and engineering methodologies established in this thesis lay a robust and pragmatic foundation for the next generation of highly resilient, AI-driven networked robotic systems.
