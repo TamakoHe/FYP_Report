@@ -1,0 +1,188 @@
+<?xml version="1.0" ?>
+<!-- 
+  5-DOF Customized Robotic Arm Digital Twin (Jiobt1)
+  Based on the provided hardware schematic:
+  - Total Weight: ~1.24kg
+  - Kinematics: Base Height(L0)~100mm, L1=105mm, L2=75mm, L3=65mm, Gripper=120mm
+-->
+<robot name="jiobt1_5dof_arm">
+
+  <!-- Materials matching the real photo -->
+  <material name="black"><color rgba="0.15 0.15 0.15 1.0"/></material>
+  <material name="red_servo"><color rgba="0.8 0.1 0.2 1.0"/></material>
+  <material name="purple_servo"><color rgba="0.4 0.2 0.6 1.0"/></material>
+  <material name="dark_grey"><color rgba="0.25 0.25 0.25 1.0"/></material>
+
+  <!-- 0. Base Link (底座转盘: 包含底层电机和金属底板) -->
+  <link name="base_link">
+    <inertial>
+      <mass value="0.44"/> <!-- 分配总重量 1.24kg 的一部分 -->
+      <inertia ixx="0.005" ixy="0" ixz="0" iyy="0.005" iyz="0" izz="0.008"/>
+    </inertial>
+    <visual>
+      <geometry><cylinder radius="0.085" length="0.06"/></geometry>
+      <origin xyz="0 0 0.03" rpy="0 0 0"/>
+      <material name="black"/>
+    </visual>
+    <collision>
+      <geometry><cylinder radius="0.085" length="0.06"/></geometry>
+      <origin xyz="0 0 0.03" rpy="0 0 0"/>
+    </collision>
+  </link>
+
+  <!-- 1. Shoulder Bracket (连接底座旋转和肩部俯仰的 U型支架) -->
+  <link name="link1_bracket">
+    <inertial>
+      <mass value="0.20"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+    <visual>
+      <geometry><box size="0.04 0.05 0.04"/></geometry>
+      <origin xyz="0 0 0.02" rpy="0 0 0"/>
+      <material name="red_servo"/> <!-- 红色 25KG.CM 舵机 -->
+    </visual>
+  </link>
+
+  <!-- Joint 0: 底座水平旋转 (Yaw) -->
+  <joint name="joint0" type="revolute">
+    <parent link="base_link"/>
+    <child link="link1_bracket"/>
+    <origin xyz="0 0 0.06" rpy="0 0 0"/> <!-- 高度偏移 60mm -->
+    <axis xyz="0 0 1"/> <!-- 绕 Z 轴旋转 -->
+    <limit lower="-3.14" upper="3.14" effort="10" velocity="3"/>
+  </joint>
+
+  <!-- 2. Main Arm (大臂 L1 = 10.5cm) -->
+  <link name="link2_main_arm">
+    <inertial>
+      <mass value="0.25"/>
+      <inertia ixx="0.002" ixy="0" ixz="0" iyy="0.002" iyz="0" izz="0.0005"/>
+    </inertial>
+    <visual>
+      <geometry><box size="0.03 0.04 0.105"/></geometry>
+      <origin xyz="0 0 0.0525" rpy="0 0 0"/> <!-- 质心与视觉中心在长度一半处 -->
+      <material name="black"/>
+    </visual>
+  </link>
+
+  <!-- Joint 1: 肩部俯仰 (Pitch) -->
+  <joint name="joint1" type="revolute">
+    <parent link="link1_bracket"/>
+    <child link="link2_main_arm"/>
+    <origin xyz="0 0 0.04" rpy="0 0 0"/> <!-- 使得 J1 的总高度恰好约 100mm (L0) -->
+    <axis xyz="0 1 0"/> <!-- 绕 Y 轴俯仰 -->
+    <limit lower="-2.35" upper="2.35" effort="10" velocity="3"/>
+  </joint>
+
+  <!-- 3. Forearm (小臂 L2 = 7.5cm) -->
+  <link name="link3_forearm">
+    <inertial>
+      <mass value="0.15"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.0005"/>
+    </inertial>
+    <visual>
+      <geometry><box size="0.03 0.04 0.075"/></geometry>
+      <origin xyz="0 0 0.0375" rpy="0 0 0"/>
+      <material name="black"/>
+    </visual>
+  </link>
+
+  <!-- Joint 2: 肘部俯仰 (Pitch) -->
+  <joint name="joint2" type="revolute">
+    <parent link="link2_main_arm"/>
+    <child link="link3_forearm"/>
+    <origin xyz="0 0 0.105" rpy="0 0 0"/> <!-- 偏移大臂长度 10.5cm -->
+    <axis xyz="0 1 0"/> <!-- 绕 Y 轴俯仰 -->
+    <limit lower="-2.35" upper="2.35" effort="8" velocity="3"/>
+  </joint>
+
+  <!-- 4. Wrist (腕部 L3 = 6.5cm) -->
+  <link name="link4_wrist">
+    <inertial>
+      <mass value="0.08"/>
+      <inertia ixx="0.0005" ixy="0" ixz="0" iyy="0.0005" iyz="0" izz="0.0001"/>
+    </inertial>
+    <visual>
+      <geometry><box size="0.03 0.04 0.065"/></geometry>
+      <origin xyz="0 0 0.0325" rpy="0 0 0"/>
+      <material name="black"/>
+    </visual>
+  </link>
+
+  <!-- Joint 3: 腕部俯仰 (Pitch) -->
+  <joint name="joint3" type="revolute">
+    <parent link="link3_forearm"/>
+    <child link="link4_wrist"/>
+    <origin xyz="0 0 0.075" rpy="0 0 0"/> <!-- 偏移小臂长度 7.5cm -->
+    <axis xyz="0 1 0"/> <!-- 绕 Y 轴俯仰 -->
+    <limit lower="-2.35" upper="2.35" effort="5" velocity="3"/>
+  </joint>
+
+  <!-- 5. Gripper Base (夹爪旋转底座, 包含紫色 ZP15D 舵机) -->
+  <link name="link5_gripper_base">
+    <inertial>
+      <mass value="0.06"/>
+      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+    </inertial>
+    <visual>
+      <geometry><box size="0.04 0.03 0.04"/></geometry>
+      <origin xyz="0 0 0.02" rpy="0 0 0"/>
+      <material name="purple_servo"/> 
+    </visual>
+  </link>
+
+  <!-- Joint 4: 夹爪旋转 (Roll/Yaw) -->
+  <joint name="joint4" type="revolute">
+    <parent link="link4_wrist"/>
+    <child link="link5_gripper_base"/>
+    <origin xyz="0 0 0.065" rpy="0 0 0"/> <!-- 偏移腕部长度 6.5cm -->
+    <axis xyz="0 0 1"/> <!-- 夹爪绕机械臂本体 Z 轴自转 -->
+    <limit lower="-3.14" upper="3.14" effort="3" velocity="3"/>
+  </joint>
+
+  <!-- 6. Gripper Fingers (虚拟的夹爪指部，构建 120mm 总长) -->
+  <link name="gripper_fingers">
+    <inertial>
+      <mass value="0.06"/> <!-- 使得机械臂总重大致为 1.24kg -->
+      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+    </inertial>
+    <!-- 左爪 -->
+    <visual>
+      <geometry><box size="0.01 0.02 0.08"/></geometry>
+      <origin xyz="-0.025 0 0.04" rpy="0 0 0"/>
+      <material name="dark_grey"/>
+    </visual>
+    <!-- 右爪 -->
+    <visual>
+      <geometry><box size="0.01 0.02 0.08"/></geometry>
+      <origin xyz="0.025 0 0.04" rpy="0 0 0"/>
+      <material name="dark_grey"/>
+    </visual>
+  </link>
+
+  <joint name="gripper_fixed_joint" type="fixed">
+    <parent link="link5_gripper_base"/>
+    <child link="gripper_fingers"/>
+    <origin xyz="0 0 0.04" rpy="0 0 0"/>
+  </joint>
+
+  <!-- 7. End Effector (虚拟末端执行器点，距夹爪旋转轴精确 120mm，用于目标追踪) -->
+  <link name="ee_link">
+    <inertial>
+      <mass value="0.001"/>
+      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+    </inertial>
+    <visual>
+      <geometry><sphere radius="0.015"/></geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <material name="red_servo"/>
+    </visual>
+  </link>
+  
+  <joint name="ee_joint" type="fixed">
+    <parent link="link5_gripper_base"/>
+    <child link="ee_link"/>
+    <origin xyz="0 0 0.12" rpy="0 0 0"/> <!-- 夹爪部分总长 120mm -->
+  </joint>
+
+</robot>
