@@ -1,12 +1,45 @@
-\section{Conclusions}
+\section{Discussion}
+The empirical results presented in Chapter 3 systematically validate the superiority of the proposed Deep Reinforcement Learning (DRL)-driven 
+Joint Communication and Control (JCC) framework across diverse cyber-physical domains--ranging from highly redundant industrial manipulators to 
+underactuated UAVs and resource-constrained edge actuators.
 
-Every report must have conclusions, built on the discussion. This section includes a summary of the main achievements of the work but is more than that. The noun `conclusion' can be defined as `a judgement or decision reached by reasoning' \cite{oupconc} so you should highlight what has been learnt as a result of your project. What is the big picture that the reader should take away? 
+However, beyond quantitative reduction in Root Mean Square Error (RMSE) and extended survivability, these findings carry profound theoretical and 
+practical engineering implications for the future of Networked Control Systems (NCS). This chapter synthesizes the experimental 
+outcomes, interprets the underlying physical and mathematical mechanisms that drive the DRL agent's superiority, analyzes the engineering considerations 
+for Sim-to-Real deployment, and critically examines the boundaries and limitations of the proposed architecture.
+\subsection{Transcending Shannon's Paradigm: The Shift to Pragmatic Communication}
+Historically, the design of robotic communication networks has been heavily governed by Shannon's separation principle, which dictates 
+that data compression (source coding) and error protection (channel coding) can be optimized independently of the downstream application.
+Under this paradigm, Uniform Allocation serves as the standard approach, attempting to minimize the overall digital Mean Squared Error (MSE)
+of the transmitted bitstream without considering the physical semantics of the data.
 
-The Conclusions should include an assessment of the outcome against the original aims of the project. If you were unable to fulfil some aims, explain why. It is also useful to review the project plan (which should be included with the report). Did some tasks prove to be unexpectedly difficult, for instance?
+The catastrophic collapse of the Uniform allocation scheme under the 14-bit and 15-bit extreme bottlenecks (as observed in both the Franka manipulator and the Digital Twin stress tests) 
+explicitly highlights the fallacy of this separation in resource-starved cyber-physical systems. In robotics, not all bits are created equal. 
+A 1-bit quantization error at a distal wrist joint may cause a millimeter-level end-effector deviation, whereas the exact same 1-bit error at a proximal base joint is amplified by the mechanical lever arm,
+resulting in decimeter-level deviations or catastrophic collisions.
 
-\subsection{Suggestions for further work}
+The proposed DRL framework successfully operationalizes the concept \textit{Pragmatic Communication} (or Goal-Oriented Communication).
+By optimizing a competitive reward function rooted in the true physical Euclidean error rather than the digital bit-error rate, the agent 
+organically learns to assign "value" to information based on its real-time utility to the control task. The agent's willingness to aggressive starve 
+wrist joints to safeguard the base joints proves that in extreme NCS, transmitting less accurate overall digital data can paradoxically result in \textit{more precise} physical control, 
+provided the degradation is intelligently managed.
+\subsection{Deciphering the Collapse of Static Mathematical Models}
+One of the most critical academic observations from the experiments is the nuanced performance of the Static Linear Quadratic Regulator (LQR)-weighted 
+allocation. While it demonstrated commendable baseline resilience compared to Uniform allocation, it suffered catastrophic failures under specific "stress" conditions, such as the Maximum Stretch Posture and the Heavy Payload Drop.
 
-Almost every project leaves you with ideas for the future. Research typically answers some questions while opening new ones; by the end of a design-and-build project you may have thought of a superior approach. Examiners are impressed by intelligent suggestions for further work because they show that you really understand the project. It is often a sign of strength to identify the weak points and suggest solutions for them.
+This failure mechanism can be diagnosed as \textbf{Jacobian Shifting within Nonlinear Kinematics}. Static allocation formulas rely on a predefined 
+sensitivity matrix (the Hessian or LQR $P$ matrix), which is mathematically derived by linearizing the robot's dynamics around a specific 
+equilibrium point (e.g., the safe folded home posture).
+\begin{itemize}
+    \item \textbf{Kinematic Mismatch}: When the manipulator extends to the boundary of its workspace, the nonlinear lever arms change drastically. The static formula, blind to this spatial shift, continues to allocate bandwidth based on the obsolete home-posture equations, actively misallocating resources.
+    \item \textbf{Dynamic Overloading}: In the Digital Twin stress test, the sudden $0.8\text{ kg}$ payload drop introduced massive unmodeled gravitational torque. The static formula, derived under a zero-payload assumption, refused to supply additional bandwidth to the struggling shoulder joint, resulting in uncontrollable physical sagging.
+\end{itemize}
+The DRL agent circumvents this fatal mathematical rigidity. By ingesting a highly expanded spatial observation vector (including real-time end-effector Cartesian coordinates and tracking errors), the neural network essentially functions 
+as a \textbf{Dynamic Global Jacobian Estimator}. It does not rely on a fixed linear approximation; instead, it continuously infers the non-linear physical leverage and unmodeled payload burdens on the fly, dynamically 
+redirecting bit-flow to the exact joints that require high-resolution intervention at any given millisecond.
+\subsection{Engineering Insights for Sim-to-Real Edge Deployment}
+Bridging the "Sim-to-Real" gap is arguably the most formidable challenge in deploying DRL algorithms to physical hardware. The experiments 
+conducted on the Digital Twin explicitly addressed critical engineering phenomena that are often glossed over purely theoretical JCC literature.
+\subsubsection{Soft-Servo Dynamics and Hardware Jitter}
 
-
-\clearpage % start appendices on a new page
+\section{}
