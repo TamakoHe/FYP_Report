@@ -26,12 +26,65 @@ To further prevent hardware-damaging torque spikes (derivative safety faults) ca
 
 \begin{figure}[htbp]
   \centering
-  \framebox{\parbox{0.9\textwidth}{\centering
-    \vspace{4cm}
-    \textbf{System Architecture Diagram Placeholder} \\
-    \small\textit{Illustrating the flow of data from physical sensors, through the DRL Allocator and ETC trigger, over the limited channel, to the ZOH interpolator.}
-    \vspace{4cm}
-  }}
+  \resizebox{0.95\textwidth}{!}{%
+  \begin{tikzpicture}[
+      base/.style = {rectangle, rounded corners, draw, align=center, font=\small\sffamily, thick},
+      edge/.style = {base, fill=blue!5, draw=blue!70, minimum width=3cm, minimum height=1.2cm},
+      remote/.style = {base, fill=green!5, draw=green!70, minimum width=3cm, minimum height=1.2cm},
+      plant/.style = {base, fill=orange!5, draw=orange!70, minimum width=13cm, minimum height=1.2cm, font=\bfseries\sffamily},
+      network/.style = {cloud, cloud puffs=15, cloud puff arc=120, aspect=2.5, draw=cyan!80, fill=cyan!5, thick, align=center, font=\small\sffamily, minimum height=1.5cm},
+      label/.style = {font=\scriptsize, inner sep=1pt, align=center},
+      arrow/.style = {->, >=stealth, thick, draw=black!80},
+      darrow/.style = {->, >=stealth, thick, dashed, draw=black!80}
+  ]
+
+  % EDGE NODE (Transmitter)
+  \node[edge] (sensor) at (0, 0) {Sensors \& Kinematics \\ ($f_{ctrl} = 240$ Hz)};
+  \node[edge] (dpcm) at (5.6, 0) {DPCM \& Quantizer \\ (Encode $\Delta x_k$)};
+  \node[edge] (drl) at (5.6, 2.2) {DRL Allocator \\ (PPO Agent)};
+  \node[edge] (etc) at (5.6, -2.2) {ETC Trigger \\ ($\|e_k\| > \delta$)};
+
+  % REMOTE NODE (Receiver)
+  \node[network] (channel) at (11.2, 0) {Bandwidth-Limited \\ Stochastic Channel \\ ($f_{comm} = 10$ Hz)};
+  
+  \node[remote] (zoh) at (16.6, 0) {ZOH \& Spline \\ Interpolator};
+  \node[remote] (actuator) at (16.6, -2.5) {Motor Drives \\ ($f_{ctrl} = 240$ Hz)};
+
+  % PHYSICAL PLANT
+  \node[plant] (plant) at (8.8, -5) {Physical Plant (Robotic Manipulator / UAV)};
+
+  % ARROWS - EDGE
+  \draw[arrow] (sensor.east) -- node[midway, above, label, yshift=5pt] {State Delta\\$\Delta x_k$} (dpcm.west);
+  \draw[arrow] (sensor.north) -- (0, 2.2) -- node[above, font=\footnotesize] {34-Dim State ($s_t$)} (drl.west);
+  \draw[arrow] (sensor.south) -- (0, -2.2) -- node[above, font=\footnotesize] {Tracking Error ($e_k$)} (etc.west);
+  
+  \draw[arrow] (drl.south) -- node[right, font=\footnotesize] {Dynamic Bits ($b_i$)} (dpcm.north);
+  \draw[arrow] (etc.north) -- node[right, font=\footnotesize] {Trigger Flag ($\gamma_k$)} (dpcm.south);
+
+  % ARROWS - NETWORK
+  \draw[darrow] (dpcm.east) -- node[midway, above, label, yshift=6pt] {Payload} (channel.west);
+  \draw[darrow] (channel.east) -- node[above, font=\footnotesize] {Packets} (zoh.west);
+
+  % ARROWS - REMOTE
+  \draw[arrow] (zoh.south) -- node[right, font=\footnotesize] {Smooth Trajectory $u(t)$} (actuator.north);
+
+  % ARROWS - CLOSED LOOP
+  \draw[arrow] (actuator.south) -- node[right, font=\footnotesize] {Control Torque ($\tau$)} (actuator.south |- plant.north);
+  
+  % Feedback from plant to sensor (Routing nicely around the left side)
+  \draw[arrow] (plant.west) -- (-2.2, -5) -- node[left, align=center, font=\footnotesize] {Physical\\State\\Feedback} (-2.2, 0) -- (sensor.west);
+
+  % BACKGROUND BOXES
+  \begin{scope}[on background layer]
+      \node[fill=blue!5, rounded corners, draw=blue!30, dashed, thick, fit=(sensor) (drl) (etc) (dpcm), inner sep=0.5cm] (edge_box) {};
+      \node[above, text=blue!80, font=\bfseries\sffamily] at (edge_box.north) {Edge Computing Node (Transmitter)};
+      
+      \node[fill=green!5, rounded corners, draw=green!30, dashed, thick, fit=(zoh) (actuator), inner sep=0.5cm] (remote_box) {};
+      \node[above, text=green!80, font=\bfseries\sffamily] at (remote_box.north) {Remote Control Node (Receiver)};
+  \end{scope}
+
+  \end{tikzpicture}
+  }
   \caption{The proposed Joint Communication and Control (JCC) system architecture encompassing dual-frequency decoupling and network imperfections.}
   \label{fig:architecture}
 \end{figure}

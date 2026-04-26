@@ -1,29 +1,207 @@
-\section{Appendices}
-
-Use appendices for supporting material which is relevant but of a detailed nature. In this way the flow of ideas in the body of the report is not interrupted. Appendices are usually lettered rather than numbered to distinguish them. Several uses for appendices have been suggested already but bear in mind that a CD may be more appropriate for large tables of results, long programs and data sheets or other background information. Appendices are not included in the word count because the assessors are not obliged to read them. Do not put vital points here!
-
-Include your project plan and interim reports as appendices on paper.
-
-\section{University's Plagiarism Statement}
-\label{plagiarism sect}
-
-The University's degrees and other academic awards are given in recognition of a student's personal achievement. All work submitted by students for assessment is accepted on the understanding that it is the student's own effort. 
-
-Plagiarism is defined as the submission or presentation of work, in any form, which is not one's own, without acknowledgement of the sources. Plagiarism includes inappropriate collaboration with others. Special cases of plagiarism can arise from a student using his or her own previous work (termed auto-plagiarism or self-plagiarism). Autoplagiarism includes using work that has already been submitted for assessment at this University or for any other academic award.
-
-The incorporation of material without formal and proper acknowledgement (even with no deliberate intent to cheat) can constitute plagiarism. Work may be considered to be plagiarised if it consists of: 
+\section{Appendix A: Kinematic and Dynamic Parameters of the Evaluated Plants}
+\subsection{Franka Emika Panda Manipulator Parameters}
+\begin{table}[H]
+  \centering
+  \renewcommand{\arraystretch}{1.5} % 适当调整行高使排版更清晰
+  \caption{Dynamic and Kinematic Limits of Franka Emika Panda}
+  \label{tab:franka_limits}
+  % 如果表格超宽，可以取消下一行的注释并启用 \small
+  % \small 
+  \footnotesize
+  \begin{tabular}{llllll}
+    \toprule
+    Link / Joint $i$ & Mass (kg) & Pos Limit Min (rad) & Pos Limit Max (rad) & Max Velocity (rad/s) & Max Torque (N$\cdot$m) \\
+    \midrule
+    0 (Base) & 2.90 & -       & -      & -      & -  \\
+    1        & 2.70 & -2.9671 & 2.9671 & 2.1750 & 87 \\
+    2        & 2.73 & -1.8326 & 1HH8326 & 2.1750 & 87 \\
+    3        & 2.04 & -2.9671 & 2.9671 & 2.1750 & 87 \\
+    4        & 2.08 & -3.1416 & 0.0000 & 2.1750 & 87 \\
+    5        & 3.00 & -2.9671 & 2.9671 & 2.6100 & 12 \\
+    6        & 1.30 & -0.0873 & 3.8223 & 2.6100 & 12 \\
+    7        & 0.20 & -2.9671 & 2.9671 & 2.6100 & 12 \\
+    \addlinespace % 在机械臂关节和夹爪之间添加了一点额外的垂直间距
+    Gripper  & 0.81 & 0.0000 (m) & 0.0400 (m) & 0.2000 (m/s) & 20 (N) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+\begin{table}[H]
+  \centering
+  \renewcommand{\arraystretch}{1.5} % 适当调整行高使排版更清晰
+  \caption{Standard Denavit-Hartenberg (D-H) Parameters}
+  \label{tab:dh_parameters}
+  \footnotesize
+  \begin{tabular}{lllll}
+    \toprule
+    Joint $i$ & $a_i$ (m) & $\alpha_i$ (rad) & $d_i$ (m) & $\theta_i$ (rad) \\
+    \midrule
+    1 & 0       & $-\pi/2$ & 0.333 & $q_1$ \\
+    2 & 0       & $\pi/2$  & 0     & $q_2$ \\
+    3 & 0.0825  & $\pi/2$  & 0.316 & $q_3$ \\
+    4 & -0.0825 & $-\pi/2$ & 0     & $q_4$ \\
+    5 & 0       & $\pi/2$  & 0.384 & $q_5$ \\
+    6 & 0.088   & $\pi/2$  & 0     & $q_6$ \\
+    7 & 0       & 0        & 0.107 & $q_7$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+\textbf{Note:} The parameters $a_i, \alpha_i$, and $d_i$ are fixed physical constants defined by the manipulator's hardware dimensions. 
+Since the Franka Emika Panda consists exclusively of revolute joints, $\theta_i$ is the only dynamic kinematic variable, explicitly represented here by the real-time generalized coordinate (joint angle) $q_i$.
+\subsection{Quadrotor UAV Physical Specifications}
+\begin{table}[H]
+  \centering
+  \renewcommand{\arraystretch}{1.5} % 适当增加行高，保持表格清爽
+  \caption{Dynamic and Physical Specifications of Quadrotor UAV}
+  \label{tab:quadrotor_specs}
+  \begin{tabular}{llll}
+    \toprule
+    Parameter & Symbol & Value & Unit \\
+    \midrule
+    Total Mass & $m$ & 0.5 & kg \\
+    Gravity Constant & $g$ & 9.81 & m/s$^2$ \\
+    Inertia Tensor (X-axis) & $I_{xx}$ & 0.008 & kg$\cdot$m$^2$ \\
+    Inertia Tensor (Y-axis) & $I_{yy}$ & 0.008 & kg$\cdot$m$^2$ \\
+    Inertia Tensor (Z-axis) & $I_{zz}$ & 0.015 & kg$\cdot$m$^2$ \\
+    Center of Mass Offset (Z) & $\Delta Z$ & $-0.05$ & m \\
+    Maximum Total Thrust & $T_{max}$ & 9.81 & N \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+\textbf{Note: }The negative Z-offset ($\Delta Z = -0.05$ m) for the Center of Mass intentionally creates a physical "pendulum effect", significantly enhancing the UAV's passive aerodynamic stability and robustness against wind disturbances during reinforcement learning training.
+\begin{table}[H]
+  \centering
+  \renewcommand{\arraystretch}{1.5} % 适当调整行高使排版更清晰
+  \caption{Maximum State Deltas ($\Delta_{max}$) per Communication Interval (0.1s)}
+  \label{tab:max_state_deltas}
+  \begin{tabular}{llll}
+    \toprule
+    State Variable Group & Array Index & Max Kinematic Allowance & Unit \\
+    \midrule
+    3D Position ($x, y, z$)             & 0, 1, 2   & $\pm 0.5$ & m \\
+    Euler Angles ($\phi, \theta, \psi$) & 3, 4, 5   & $\pm 0.5$ & rad \\
+    Linear Velocity ($v_x, v_y, v_z$)   & 6, 7, 8   & $\pm 1.0$ & m/s \\
+    Angular Velocity ($p, q, r$)        & 9, 10, 11 & $\pm 2.0$ & rad/s \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+\section{Appendix B: Comprehensive DRL Hyperparameters and Network Architectures}
+To ensure the complete reproducibility of the deep reinforcement learning (DRL) experiments presented in this thesis, this appendix details the specific neural network architectures and hyperparameter configurations utilized for the Proximal Policy Optimization (PPO) agent across all validation scenarios.
+\subsection{Policy and Value Network Architecture}
+Given the complex, expanded 34-dimensional spatial-aware observation space (incorporating generalized coordinates, velocities, and 3D Euclidean tracking errors), a high-capacity neural architecture was essential to capture the non-linear mapping between spatial tracking and bandwidth distribution. 
+Both the Actor (Policy) network and the Critic (Value) network share a symmetric Multilayer Perceptron (MLP) design, though their weights are completely independent:
 \begin{itemize}
-\item
-a direct quotation; 
-\item
-a close paraphrase; 
-\item
-an unacknowledged summary of a source; 
-\item
-direct copying or transcription.
+    \item \textbf{Input Layer}: Matches the observation dimension (34 for the 7-DOF manipulator, 36 for the 12-dimensional UAV, and 22 for the edge manipulator).
+    \item \textbf{Hidden Layers}: Two dense linear layers, each comprising exactly \textbf{256 neurons}, intertwined with Rectified Linear Unit (ReLU) activation functions to introduce necessary non-linearities.
+    \item \textbf{Output Layer}: \textit{Actor}: Maps to the action dimension (e.g., 7 for Franka), outputting unbounded continuous values which are subsequently squashed by a deterministic Softmax layer into valid bit dicstributions
+          , \textit{Critic}:  A single neuron outputting the scalar baseline value estimation $V(s)$.
 \end{itemize}
-With regard to essays, reports and dissertations, the rule is: if information or ideas are obtained from any source, that source must be acknowledged according to the appropriate convention in that discipline; and any direct quotation must be placed in quotation marks and the source cited immediately. Any failure to acknowledge adequately or to cite properly other sources in submitted work is plagiarism. Under examination conditions, material learnt by rote or close paraphrase will be expected to follow the usual rules of reference citation otherwise it will be considered as plagiarism. Departments should provide guidance on other appropriate use of references in examination conditions. 
+\subsection{PPO Hyperparameter Configuration}
+The training pipeline was executed utilizing the \inlinecode{stable-baselines3} library.
+To prevent catastrophic forgetting during the exploration of highly discontinuous quantization terrains and to suppress physics-induced gradient explosions, the hyperparameters were fine-tuned as listed in Table.~\ref{tab:ppo_hyperparams}.
+\begin{table}[H]
+  \centering
+  \renewcommand{\arraystretch}{1.5} % 适当调整行高使排版更清晰
+  \caption{PPO Algorithm Training Hyperparameters}
+  \label{tab:ppo_hyperparams}
+  % 使用 tabularx 并设置总宽度为 \textwidth，最后一列用 X 实现自动换行
+  \footnotesize
+  \begin{tabularx}{\textwidth}{lllX}
+    \toprule
+    Hyperparameter & Symbol & Value & Description \\
+    \midrule
+    \textbf{Learning Rate} & $\alpha$ & $3 \times 10^{-4}$ (Linear Decay) & Employs a linear decay schedule from initial value to 0.0, stabilizing steady-state convergence. \\
+    
+    \textbf{Discount Factor} & $\gamma$ & $0.99$ & High emphasis on long-term reward maximization. \\
+    
+    \textbf{GAE Parameter} & $\lambda_G$ & $0.95$ & Generalized Advantage Estimation trace decay parameter for bias-variance trade-off. \\
+    
+    \textbf{Clip Range} & $\epsilon$ & $0.2$ & Constrains the surrogate objective ratio to prevent destructively large policy updates. \\
+    
+    \textbf{Entropy Coefficient} & $c_2$ & $0.01$ & Encourages sufficient exploration across the discrete quantization step-spaces. \\
+    
+    \textbf{Value Function Coeff.} & $c_1$ & $0.5$ & Scaling factor for the Critic's mean squared error loss. \\
+    
+    \textbf{Max Gradient Norm} & - & $0.5$ & Global gradient clipping threshold to prevent exploding gradients during kinematic singularities. \\
+    
+    \textbf{Rollout Buffer Size} & $N_{steps}$ & 512 & Steps collected per environment before updating. \\
+    
+    \textbf{Number of Environments} & $N_{envs}$ & 8 (Multi-core) & Number of parallel PyBullet physics engines executed via \inlinecode{SubprocVecEnv}. \\
+    
+    \textbf{Effective Batch Size} & $B$ & 4096 & Total experiences per update ($N_{steps} \times N_{envs}$). \\
+    
+    \textbf{Reward Clipping Bounds} & $C$ & $[-50.0, 50.0]$ & Clips the physical mm-level tracking reward to prevent the Critic from experiencing unbounded variance during collisions. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+\section{Appendix C: Digital Twin Configuration of the Edge Manipulator}
+To validate the proposed Joint Communication and Control (JCC) framework's deployability on resource-constrained edge devices, a high-fidelity Digital Twin of a custom 5-Degree-of-Freedom (5-DOF) serial manipulator (based on the Jiobt1 hardware architecture) was constructed using the Unified Robot Description Format (URDF). 
+This appendix details the precise kinematic dimensions, empirical mass distributions, and the critical soft-servo emulation parameters utilized during the composite stress tests in Section~\ref{sec:dtc}.
+\subsection{Kinematic Dimensions and Mass Distribution}
+Unlike industrial-grade manipulators, edge actuators are characterized by lightweight, cost-effective materials. The total system mass was calibrated to strictly match the physical hardware ($m_{total} = 1.24$ kg). The length of each segment and its corresponding mass are detailed in Table.~\ref{tab:manipulator_properties}.
+\begin{table}[H]
+  \centering
+  \renewcommand{\arraystretch}{1.5} % 增加行高，保持排版清爽
+  \caption{Kinematic and Inertial Properties of the Custom 5-DOF Manipulator}
+  \label{tab:manipulator_properties}
+  \begin{tabularx}{\textwidth}{lllX}
+    \toprule
+    Link Name & Segment Length (mm) & Calibrated Mass (kg) & Description / Function \\
+    \midrule
+    \inlinecode{base\_link}       & 60          & 0.44 & Static base platform and yaw motor housing \\
+    \inlinecode{link1\_bracket}   & 40          & 0.20 & U-bracket connecting yaw and shoulder pitch \\
+    \inlinecode{link2\_main\_arm} & 105 ($L_1$) & 0.25 & Primary load-bearing shoulder segment \\
+    \inlinecode{link3\_forearm}   & 75 ($L_2$)  & 0.15 & Secondary elbow segment \\
+    \inlinecode{link4\_wrist}     & 65 ($L_3$)  & 0.08 & Distal wrist pitch articulation \\
+    \inlinecode{gripper\_assembly}& 120 ($L_g$) & 0.12 & Combined mass of rotating base and fingers \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+\subsection{Soft-Servo Dynamics and Hardware Compliance Emulation}
+In theoretical simulations, actuators are frequently modeled with infinite stiffness and instantaneous torque delivery. 
+However, low-cost Internet of Things (IoT) manipulators are typically driven by commercial Pulse-Width Modulation (PWM) servos (e.g., standard 25 kg·cm servos), which exhibit significant mechanical compliance, gear backlash, and torque limitations.
 
-Plagiarism is considered to be an act of fraudulence and an offence against University discipline. Alleged plagiarism, at whatever stage of a student's studies, whether before or after graduation, will be investigated and dealt with appropriately by the University.
+To bridge the Sim-to-Real gap and accurately simulate the "physical sagging" observed when a heavy payload is applied, the physics engine was injected with specific \textbf{Soft-Servo Emulation Parameters} during the execution of control commands:
+\begin{itemize}
+    \item \textbf{Maximum Output Torque ($F_{max}$)}: The maximum output torque for all joints was software-capped at $2.5\;\mathbf{N\cdot m}$  (approximately equivalent to a 25.5 kg$\cdot$cm servo). This deliberate bottleneck ensures that the unmodeled $0.8$ kg payload in the stress test severely overloads the shoulder actuator, forcing the allocation algorithms to prove their adaptive limits.
+    \item \textbf{Position Gain ($K_p$)}: Set to a low value of $0.05$. This proportional gain introduces realistic physical compliance into the digital twin. Instead of rigidly locking into position, the simulated joints exhibit a spring-like flexibility, accurately replicating the hardware jitter and trajectory deflection typical of overloaded, low-cost edge robots.
+\end{itemize}
+\section{Appendix D: Pseudo-Code of the Micro-Interpolation Safety Layer}
+To safely deploy the extremely quantized, low-frequency (10 Hz) control signals generated by the DRL allocator onto physical edge actuators without triggering hardware-damaging torque-derivative faults, a
+\textbf{Micro-Interpolation Safety Layer} is implemented at the edge receiver (e.g., a local robotic microcontroller or PLC).
 
-The University reserves the right to use plagiarism detection systems, which may be externally based, in the interests of improving academic standards when assessing student work.
+Algorithm~\ref{alg:micro_interp} details the core logic of this safety layer. It acts as a local Zero-Order Hold (ZOH) combined with a high-frequency linear interpolator. 
+The layer operates at a strict, synchronous control loop frequency ($f_{ctrl} = 240$ Hz or higher) while receiving sparse network packets asynchronously. 
+This decoupling completely isolates the low-frequency network starvation from the high-frequency mechanical execution.
+
+\begin{algorithm}[htbp]
+  \caption{Edge-Node Micro-Interpolation Safety Layer}
+  \label{alg:micro_interp}
+  \begin{algorithmic}[1]
+    \State \textbf{Input:} Asynchronous Network Packets containing quantized target states $q_{\text{target}}$
+    \State \textbf{Input:} Current physical joint states $q_{\text{current}}$ from hardware encoders
+    \State \textbf{Params:} $f_{\text{comm}} = 10$ Hz (Communication rate), $f_{\text{ctrl}} = 240$ Hz (Control rate)
+    \State \textbf{Init:} $N_{\text{steps}} = f_{\text{ctrl}} / f_{\text{comm}}$ (Interpolation segments per packet)
+    \vspace{0.1cm}
+    \hrule % 模拟参数声明下方的分割线
+    \vspace{0.1cm}
+    \While{System is Active}
+      \State // Asynchronous Receive Callback Routine
+      \If{$\text{New\_Packet\_Received}()$}
+        \State $q_{\text{target}} = \text{Decode\_Payload}(\text{Packet})$
+        \For{joint $i = 1$ to $n$}
+          \State $\Delta q[i] = q_{\text{target}}[i] - q_{\text{current}}[i]$
+          \State $\text{step\_increment}[i] = \Delta q[i] / N_{\text{steps}}$
+        \EndFor
+      \EndIf
+      \State \phantom{} % 对应图中第10行的空行，且保留行号
+      \State // High-Frequency Synchronous Control Loop (Runs exactly at $f_{\text{ctrl}}$)
+      \If{$\text{Hardware\_Timer\_Tick}(1 / f_{\text{ctrl}})$}
+        \For{joint $i = 1$ to $n$}
+          \State $q_{\text{cmd}}[i] = q_{\text{cmd}}[i] + \text{step\_increment}[i]$
+          \State $\tau[i] = \text{Low\_Level\_PID\_Controller}(q_{\text{cmd}}[i], q_{\text{current}}[i])$
+          \State $\text{Apply\_Actuator\_Torque}(i, \tau[i])$
+        \EndFor
+      \EndIf
+    \EndWhile
+  \end{algorithmic}
+\end{algorithm}
