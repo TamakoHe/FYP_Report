@@ -52,7 +52,7 @@ To empirically demonstrate that the proposed framework transcends specific hardw
 \begin{itemize}
     \item \textbf{7-DOF Franka Emika Panda Manipulator}: A high-dimensional, fully-actuated, and kinematically redundant system. This platform is used to validate the agent's ability to extract high spatial precision under severe bandwidth bottlenecks, encouraging it to learn the leverage relationships between proximal (base) and distal (wrist) joints.
     \item \textbf{Quadrotor UAV (12-dimensional state)}: A classic underactuated and highly unstable dynamic system. Unlike a robotic arm that can safely stop under communication failure, a UAV that loses state feedback rapidly becomes unstable and may crash. It is employed to demonstrate the framework's ``survival prioritization'' capability---sacrificing less critical coordinates to guarantee the transmission of critical attitude (roll/pitch) data under extreme wind disturbances.
-    \item \textbf{Custom Manipulator (Digital Twin \& Physical Hardware)}: A cost-effective, resource-constrained edge device. This customized plant serves as the Sim-to-Real validation testbed. A high-fidelity Digital Twin was constructed in PyBullet for pre-training, after which the policy was deployed to the physical hardware to evaluate robustness against real-world static friction and unmodeled payload dynamics.
+    \item \textbf{Custom Manipulator (Digital Twin \& Physical Hardware)}: A cost-effective, resource-constrained edge device. This customized plant serves as the Sim-to-Real validation testbed. A high-fidelity Digital Twin was constructed in PyBullet for pre-training, after which the policy was thoroughly evaluated within the simulated environment to evaluate robustness against calibrated real-world static friction and unmodeled payload dynamics.
 \end{itemize}
 \subsubsection{Baseline Methodologies}
 To benchmark the performance of the DRL-driven dynamic allocator, two spatial allocation baselines were defined and uniformly applied across all experimental scenarios:
@@ -222,7 +222,7 @@ manipulator (based on the Jibot1 architecture) was constructed using the Unified
 \begin{figure}
     \centering
     \includegraphics[width=0.8\textwidth]{Figures/cmp.png}
-    \caption{Architectural comparison between the physical custom edge manipulator (right) and its high-fidelity Digital Twin rendered in the PyBullet physics engine (left).}
+    \caption{Architectural comparison between the target physical custom edge manipulator (right) and its high-fidelity Digital Twin rendered in the PyBullet physics engine (left).}
 \end{figure}
 To guarantee simulation fidelity, the kinematic and dynamic parameters of the URDF model were empirically measured and calibrated against 
 the physical hardware. The specific configuration parameters are detailed as follows:
