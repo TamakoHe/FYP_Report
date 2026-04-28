@@ -20,7 +20,7 @@ To accurately mirror real-world industrial networks and mitigate the severe "tra
 \end{itemize}
 This structural decoupling ensures that control commands are transmitted pragmatically over the network. At the receiver end, the actuator employs a Zero-Order Hold (ZOH) mechanism~\cite{CCSTD,SNCS} to reconstruct the continuous-time control signal $u(t)$ from the discrete packets $u_k$:
 \begin{equation}
-    u(t) = u_k, \quad \forall t \in [k T_{comm} + \tau_k, (k+1) T_{comm} + \tau_{k+1})
+    u(t) = u_k, \quad \forall t \in [k T_{comm} + \tau_k, (k+1) T_{comm} + \tau_{k+1}).
 \end{equation}
 To further prevent hardware-damaging torque spikes (derivative safety faults) caused by the discrete steps of the ZOH, a local spline interpolator smooths the transitions. This decoupling paradigm completely isolates the high-frequency mechanical chattering from the low-frequency communication bottleneck.
 
@@ -110,7 +110,7 @@ where $m_i$ is the mass of link $i$, $I_i$ is the inertia tensor relative to the
 
 Defining the Lagrangian $\mathcal{L} = \mathcal{K} - \mathcal{P}$, the continuous-time dynamics are derived via:
 \begin{equation}
-    \frac{d}{dt} \left( \frac{\partial \mathcal{L}}{\partial \dot{q}_i} \right) - \frac{\partial \mathcal{L}}{\partial q_i} = \tau_i, \quad i = 1, \dots, n
+    \frac{d}{dt} \left( \frac{\partial \mathcal{L}}{\partial \dot{q}_i} \right) - \frac{\partial \mathcal{L}}{\partial q_i} = \tau_i, \quad i = 1, \dots, n.
 \end{equation}
 By evaluating the partial derivatives and utilizing Christoffel symbols of the first kind to group the Coriolis and centrifugal terms, this resolves to the standard nonlinear second-order differential equation:
 \begin{equation} \label{eq:manipulator_dynamics}
@@ -127,7 +127,7 @@ where:
 
 To transform Equation \ref{eq:manipulator_dynamics} into a standard state-space representation, let the system state vector be defined as $x(t) = [q(t)^T, \dot{q}(t)^T]^T \in \mathbb{R}^{2n}$, and the control input as $u(t) = \tau(t) \in \mathbb{R}^n$. The nonlinear dynamics can be rewritten as a first-order ordinary differential equation $\dot{x}(t) = f(x(t), u(t))$:
 \begin{equation}
-    \dot{x}(t) = \begin{bmatrix} \dot{q} \\ M(q)^{-1}(\tau - C(q,\dot{q})\dot{q} - G(q)) \end{bmatrix}
+    \dot{x}(t) = \begin{bmatrix} \dot{q} \\ M(q)^{-1}(\tau - C(q,\dot{q})\dot{q} - G(q)) \end{bmatrix}.
 \end{equation}
 
 For advanced linear control methodologies (such as LQR) and mathematical sensitivity analysis, this nonlinear model must be linearized around a nominal operating equilibrium point $(x_e, u_e)$. Defining the state deviation $\Delta x = x - x_e$ and input deviation $\Delta u = u - u_e$, and employing Jacobian linearization via Taylor series expansion (neglecting higher-order terms), the continuous-time linear time-invariant (LTI) model is obtained:
@@ -176,31 +176,31 @@ In a severely bandwidth-constrained NCS, the underactuated nature of the UAV pos
 
 The critical constraint in this thesis is the extreme limitation of the communication channel. Let the network capacity limit be defined as a maximum allowed budget of $B_{total}$ bits per sampling interval $T_s$ (in this work, $T_s$ is set to the communication period $T_{comm}$ unless otherwise specified). Let $b_{i,k}$ denote the number of bits allocated to the $i$-th element of the state vector. The absolute resource constraint mandates that:
 \begin{equation}
-    \sum_{i=1}^{N_{dim}} b_{i,k} \le B_{total}, \quad b_{i,k} \in \mathbb{Z}^+
+    \sum_{i=1}^{N_{dim}} b_{i,k} \le B_{total}, \quad b_{i,k} \in \mathbb{Z}^+ .
 \end{equation}
 
 When no transmission is triggered ($\gamma_k=0$), no payload is sent and bit allocation is skipped; the constraint above applies to transmission instants ($\gamma_k=1$). Transmitting the absolute state $x_k$ under extreme bit constraints (e.g., averaging 2 bits per joint) directly introduces catastrophic quantization noise. To quantify this effect, we analyze the resulting distortion under a standard uniform quantization model and high-resolution approximation~\cite{FCUDRC,CONFRC}.
 
 Assume a state variable $x_i$ is uniformly distributed over an operational range $[-R_i, R_i]$. A uniform quantizer divides this range into $M_i = 2^{b_i}$ discrete levels. The step size of the quantizer is thus:
 \begin{equation}
-    \Delta_i = \frac{2R_i}{2^{b_i}}
+    \Delta_i = \frac{2R_i}{2^{b_i}}.
 \end{equation}
 The quantization error is defined as $e_{q,i} = x_i - \mathcal{Q}(x_i)$. Assuming the number of quantization levels is sufficiently large, the quantization error can be modeled as a random variable uniformly distributed within the interval $[-\frac{\Delta_i}{2}, \frac{\Delta_i}{2}]$. The Probability Density Function (PDF) of $e_{q,i}$ is $f(e) = \frac{1}{\Delta_i}$.
 
 The variance (distortion) of the quantization noise $\sigma_{q,i}^2$ is calculated by integrating the squared error over the probability distribution:
 \begin{equation}
-    \sigma_{q,i}^2 = \mathbb{E}[e_{q,i}^2] = \int_{-\Delta_i/2}^{\Delta_i/2} e^2 f(e) de = \int_{-\Delta_i/2}^{\Delta_i/2} \frac{e^2}{\Delta_i} de = \left[ \frac{e^3}{3\Delta_i} \right]_{-\Delta_i/2}^{\Delta_i/2} = \frac{\Delta_i^2}{12}
+    \sigma_{q,i}^2 = \mathbb{E}[e_{q,i}^2] = \int_{-\Delta_i/2}^{\Delta_i/2} e^2 f(e) de = \int_{-\Delta_i/2}^{\Delta_i/2} \frac{e^2}{\Delta_i} de = \left[ \frac{e^3}{3\Delta_i} \right]_{-\Delta_i/2}^{\Delta_i/2} = \frac{\Delta_i^2}{12}.
 \end{equation}
 Substituting the step size $\Delta_i$ back into the variance equation reveals the exponential relationship between bit allocation and signal distortion:
 \begin{equation}
-    \sigma_{q,i}^2 = \frac{(2R_i/2^{b_i})^2}{12} = \frac{R_i^2}{3} 2^{-2b_i}
+    \sigma_{q,i}^2 = \frac{(2R_i/2^{b_i})^2}{12} = \frac{R_i^2}{3} 2^{-2b_i}.
 \end{equation}
 
 For a robotic manipulator, a 2-bit representation ($b_i=2$) of a full $360^\circ$ joint rotation ($R_i = \pi$) yields a massive variance. The physical interpretation is a step size of $90^\circ$, causing violent non-linear physical "chattering" and triggering kinematic singularity explosions in the IK solver.
 
 To systematically resolve this, the proposed architecture introduces \textbf{Differential Pulse Code Modulation (DPCM)}. Instead of transmitting the absolute state, the edge node calculates the state increment (delta) within the specific communication interval:
 \begin{equation}
-    \Delta x_{i,k} = x_{i,k} - \hat{x}_{i,k-1}
+    \Delta x_{i,k} = x_{i,k} - \hat{x}_{i,k-1}.
 \end{equation}
 
 Stacking all dimensions yields the delta vector $\Delta x_k = [\Delta x_{1,k}, \dots, \Delta x_{N_{dim},k}]^T$. The transmitted payload is the quantized delta: $\Delta x_{i,k}^q = \mathcal{Q}(\Delta x_{i,k}, b_{i,k})$, where the quantization function $\mathcal{Q}(\cdot)$ maps the continuous delta into discrete levels bounded within $[-\Delta_{max}, \Delta_{max}]$ by physical rate limits (e.g., $\Delta_{max}=0.2$ rad per 0.1s communication step, governed by maximum motor velocity bounds $v_{max} \times T_{comm}$). 
@@ -209,7 +209,7 @@ By shrinking the quantization range from the absolute bounds $R_i$ to the increm
 
 At the controller side, a Zero-Order Hold (ZOH) updates the estimated remote state $\hat{x}_k$ incorporating the Event-Triggered decision variable $\gamma_k \in \{0,1\}$:
 \begin{equation} \label{eq:remote_update}
-    \hat{x}_k = \gamma_k (\hat{x}_{k-1} + \Delta x_k^q) + (1 - \gamma_k) \hat{x}_{k-1}
+    \hat{x}_k = \gamma_k (\hat{x}_{k-1} + \Delta x_k^q) + (1 - \gamma_k) \hat{x}_{k-1}.
 \end{equation}
 Equation \ref{eq:remote_update} powerfully unifies the temporal-spatial interplay: If $\gamma_k=1$, the spatial quantizer $\mathcal{Q}(\cdot)$ dictates the precision of the payload. If $\gamma_k=0$, zero bits are transmitted across the channel, avoiding unnecessary channel occupation.
 
@@ -221,7 +221,7 @@ To aggressively truncate redundant transmissions in the temporal domain, an Even
 
 The ETC logic evaluates the state measurement error $e_k = x_k - \hat{x}_k$. A transmission is triggered ($\gamma_k = 1$) if and only if the Euclidean norm of the error exceeds a predefined safety threshold $\delta$:
 \begin{equation}
-    ||e_k||_2 > \delta
+    ||e_k||_2 > \delta.
 \end{equation}
 
 The stability of this ETC mechanism can be rigorously analyzed via Lyapunov stability theory and Input-to-State Stability (ISS) frameworks~\cite{AIETSC,DTMEC}. Consider a continuous-time analog for the derivation. Let the system dynamics with feedback be $\dot{x}(t) = A x(t) + B K \hat{x}(t)$, where $\hat{x}(t) = x(t) - e(t)$. In digital implementations, the triggering condition is evaluated at discrete instants (e.g., $t=kT_s$), which guarantees a minimum inter-event time of $T_s$.
@@ -234,13 +234,13 @@ Taking the time derivative of $V(x)$ along the system trajectories yields:
 \begin{align}
     \dot{V}(x) &= \dot{x}^T P x + x^T P \dot{x} \\
                &= x^T ((A+BK)^T P + P(A+BK)) x - 2 x^T P B K e \\
-               &= -x^T Q x - 2 x^T P B K e
+               &= -x^T Q x - 2 x^T P B K e.
 \end{align}
 To establish an ISS-type practical stability bound, we analyze conditions under which $\dot{V}(x)$ remains negative outside a neighborhood. We can bound the derivative using the minimum eigenvalue of $Q$, $\lambda_{min}(Q)$, and the induced norms of the matrices:
 \begin{equation}
     \dot{V}(x) \le -\lambda_{min}(Q) ||x||_2^2 + 2 ||P B K|| ||x||_2 ||e||_2
 \end{equation}
-If the triggering rule enforces $||e||_2 \le \delta$, then:
+if the triggering rule enforces $||e||_2 \le \delta$, then:
 \begin{equation}
     \dot{V}(x) \le -\lambda_{min}(Q) ||x||_2^2 + 2 ||P B K|| \delta ||x||_2
 \end{equation}
@@ -260,26 +260,26 @@ where $Q_w$ and $R_w$ are positive-definite penalty matrices. By solving the Dis
 \end{equation}
 the system obtains the Riccati matrix $P_{lqr}$, which captures local state-cost sensitivity for the linearized model. Using the high-resolution quantization model, the induced distortion on the $i$-th dimension can be written as $\sigma_{q,i}^2(b_i)=\sigma_i^2 2^{-2b_i}$ with $\sigma_i^2=\frac{R_i^2}{3}$ as a scale factor derived from its operational range. Thus, the objective of optimal bit allocation is to minimize the total weighted quantization distortion $D$:
 \begin{equation} \label{eq:optimization_problem}
-    \min_{b_i} \ D = \sum_{i=1}^{N_{dim}} P_{ii} \sigma_i^2 2^{-2b_i} \quad \text{subject to} \quad \sum_{i=1}^{N_{dim}} b_i \le B_{total}
+    \min_{b_i} \ D = \sum_{i=1}^{N_{dim}} P_{ii} \sigma_i^2 2^{-2b_i} \quad \text{subject to} \quad \sum_{i=1}^{N_{dim}} b_i \le B_{total}.
 \end{equation}
 
 To obtain a closed-form baseline, we apply a standard continuous relaxation by allowing $b_i \in \mathbb{R}_{\ge 0}$ during derivation; the resulting solution is then rounded to integers for implementation. Since $D$ decreases monotonically with each $b_i$, the optimum under this relaxation uses the full budget, and the inequality constraint is active at the solution. This constrained optimization problem can be solved using the Karush-Kuhn-Tucker (KKT) conditions and the method of Lagrange Multipliers. Defining the unconstrained Lagrangian function with multiplier $\lambda$:
 \begin{equation}
-    \mathcal{L}(b, \lambda) = \sum_{i=1}^{N_{dim}} P_{ii} \sigma_i^2 2^{-2b_i} + \lambda \left( \sum_{i=1}^{N_{dim}} b_i - B_{total} \right)
+    \mathcal{L}(b, \lambda) = \sum_{i=1}^{N_{dim}} P_{ii} \sigma_i^2 2^{-2b_i} + \lambda \left( \sum_{i=1}^{N_{dim}} b_i - B_{total} \right).
 \end{equation}
 Taking the partial derivative with respect to each bit allocation $b_i$ and setting it to zero:
 \begin{equation} \label{eq:partial_derivative}
     \frac{\partial \mathcal{L}}{\partial b_i} = -2 \ln(2) P_{ii} \sigma_i^2 2^{-2b_i} + \lambda = 0 \implies 2^{-2b_i} = \frac{\lambda}{2 \ln(2) P_{ii} \sigma_i^2}
 \end{equation}
-Applying the logarithm base 2 to solve for $b_i$:
+applying the logarithm base 2 to solve for $b_i$:
 \begin{equation} \label{eq:bi_intermediate}
     b_i = \frac{1}{2} \log_2 \left( \frac{2 \ln(2) P_{ii} \sigma_i^2}{\lambda} \right)
 \end{equation}
-To eliminate the unknown multiplier $\lambda$, we substitute Equation \ref{eq:bi_intermediate} back into the total bandwidth constraint $\sum_{i=1}^{N_{dim}} b_i = B_{total}$:
+to eliminate the unknown multiplier $\lambda$, we substitute Equation \ref{eq:bi_intermediate} back into the total bandwidth constraint $\sum_{i=1}^{N_{dim}} b_i = B_{total}$:
 \begin{equation}
     \sum_{i=1}^{N_{dim}} \frac{1}{2} \log_2 \left( \frac{2 \ln(2) P_{ii} \sigma_i^2}{\lambda} \right) = B_{total}
 \end{equation}
-Isolating $\lambda$ and substituting it back into Equation \ref{eq:bi_intermediate} yields the classic logarithmic water-filling allocation formula:
+isolating $\lambda$ and substituting it back into Equation \ref{eq:bi_intermediate} yields the classic logarithmic water-filling allocation formula:
 \begin{equation} \label{eq:lqr_waterfilling}
     b_i = \frac{B_{total}}{N_{dim}} + \frac{1}{2} \log_2 \left( \frac{P_{ii} \sigma_i^2}{\left( \prod_{j=1}^{N_{dim}} P_{jj} \sigma_j^2 \right)^{1/N_{dim}}} \right)
 \end{equation}
@@ -301,7 +301,7 @@ where $p_t, p_{target, t} \in \mathbb{R}^3$ represent the real-time 3D Cartesian
 \noindent\textbf{2. Action Space $\mathcal{A}$ and Differentiable Softmax Mapping}:\\
 The policy network outputs a continuous, unconstrained action vector $a_t \in \mathbb{R}^n$. Since physical network protocols strictly necessitate discrete integer constraints $\sum b_{i,t} \le B_{total}$, a deterministic Softmax mapping layer is designed to bridge the continuous-discrete gap:
 \begin{equation}
-    w_{i,t} = \frac{\exp(a_{i,t})}{\sum_{j=1}^n \exp(a_{j,t})}
+    w_{i,t} = \frac{\exp(a_{i,t})}{\sum_{j=1}^n \exp(a_{j,t})}.
 \end{equation}
 The remaining allocatable bits are distributed proportionally: $b_{float, i} = b_{min} + w_{i,t} \times (B_{total} - n \times b_{min})$. The fractional values are then rounded down, $b_i=\lfloor b_{float, i} \rfloor$, with fractional remainders iteratively reassigned to the highest remainders. This mapping paradigm guarantees absolute resource compliance and typically utilizes the full budget at transmission instants, while the softmax gradient $\frac{\partial w_i}{\partial a_j} = w_i (\delta_{ij} - w_j)$ provides a smooth weighting mechanism for policy optimization.
 
@@ -331,7 +331,7 @@ The advantage function $\hat{A}_t$ is computed using Generalized Advantage Estim
 \begin{equation}
     \hat{A}_t = \sum_{l=0}^{\infty} (\gamma \lambda_G)^l \delta_{t+l}^{TD} \quad \text{where} \quad \delta_t^{TD} = r_t + \gamma V_\phi(s_{t+1}) - V_\phi(s_t)
 \end{equation}
-Here, $V_\phi$ is the value function estimated by the Critic network (with parameters $\phi$), $\gamma$ is the discount factor (not the triggering variable $\gamma_k$), and $\lambda_G$ is the GAE trace decay parameter. 
+here, $V_\phi$ is the value function estimated by the Critic network (with parameters $\phi$), $\gamma$ is the discount factor (not the triggering variable $\gamma_k$), and $\lambda_G$ is the GAE trace decay parameter. 
 
 To effectively process the expanded $(4n+6)$-dimensional spatial-aware observation vector (34 when $n=7$), both the Actor and Critic neural networks were upgraded to high-capacity Multilayer Perceptrons (MLPs). The architectures utilize two deep hidden layers of 256 neurons each, activated by non-linear ReLU functions, providing representational power to master the nonlinear kinematic mapping essential for Pragmatic Communication.
 
@@ -342,6 +342,6 @@ To successfully bridge the reality gap and ensure high precision at operational 
 
 Furthermore, bridging the gap to physical reality requires accounting for unmodeled discrepancies. The true physical torque $\tau_{real}$ differs from the theoretical model due to friction and payload perturbations:
 \begin{equation}
-    \tau_{real} = M(q)\ddot{q} + C(q,\dot{q})\dot{q} + G(q) + \tau_{friction} + \Delta d(t)
+    \tau_{real} = M(q)\ddot{q} + C(q,\dot{q})\dot{q} + G(q) + \tau_{friction} + \Delta d(t).
 \end{equation}
 By injecting stochastic noise directly into the starting postures and simulated actuator dynamics, the DRL agent is coerced into learning policies that are implicitly robust to these structural uncertainties. This strategic constraint ensures the neural network focuses 100\% of its learning capacity on mastering pragmatic bandwidth squeezing specifically within the functional workspace, ultimately unlocking the extreme performance showcased in the empirical evaluations.
