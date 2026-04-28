@@ -9,7 +9,7 @@ Unlike traditional tethered robots with dedicated point-to-point analog connecti
 
 To accurately mirror real-world industrial networks and mitigate the severe "tracking lag" inherent in physical actuators, our architecture explicitly implements 
 a \textbf{Dual-Frequency Decoupling} paradigm. The communication frequency $f_{comm}$(e.g., 10 Hz) is structurally decoupled from the high-frequency physical control loop $f_{ctrl}$ (e.g., 240 Hz).
-This ensures that control commands are transmitted pragmatically over the network, while the local motor drives execute smooth Zero-Order Hold (ZOH) interpolations between received waypoints, preventing hardware-damaging torque spikes and high-frequency quantization chattering.
+This ensures that control commands are transmitted pragmatically over the network, while the local motor drives execute smooth Zero-Order Hold (ZOH) interpolations between received waypoints~\cite{CCSTD}, preventing hardware-damaging torque spikes and high-frequency quantization chattering.
 
 %% TODO: 加入图表
 %% 这是一个大图 [图 3.1: 联合通信与控制系统 (JCC) 总体信息流架构图] (建议使用全页宽度的流程图，展示数据从真实传感器采集、边缘计算节点执行 ETC 判定与压缩、无线传输到接收端解压、控制电机输出的全过程)。

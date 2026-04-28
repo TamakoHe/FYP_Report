@@ -2,8 +2,8 @@
 \subsection{Background and Motivation}
 With the rapid advancement of wireless communication networks and distributed computing architectures, traditional isolated 
 robotic systems are undergoing a profound paradigm shift toward Cloud Robotics and Teleoperation~\cite{intro_cr}. In these modern 
-applications, the intensive computational and decision-making tasks multi-degree-of-freedom (Multi-DOF) robotic manipulators 
-are increasingly offloaded to edge servers or cloud infrastructure. Such systems, where sensors, controllers, and actuators 
+applications, intensive perception, planning, and control workloads from diverse cyber-physical robots (e.g., multi-degree-of-freedom (Multi-DOF) manipulators, quadrotor UAVs, and mobile platforms)
+are increasingly offloaded to edge servers or cloud infrastructure~\cite{FaI}. Such systems, where sensors, controllers, and actuators 
 are interconnected via shared communication networks to form a cyber-physical closed loop, are defined as Networked Control 
 Systems (NCS)~\cite{intro_ncs}. NCS endows robotic systems with unprecedented flexibility, scalability, and collaborative computing capabilities,
 significantly reducing the hardware costs and local power consumption of individual robots.
@@ -11,15 +11,15 @@ significantly reducing the hardware costs and local power consumption of individ
 However, incorporating communication networks into physical control loops introduces severe engineering and theoretical challenges. 
 To maintain smooth and precise physical trajectory tracking, high-DOF robotic manipulators (e.g., 6-DOF and above) typically require extremely high-frequency state updates, 
 often exceeding 1000 Hz in sensor sampling rates~\cite{intro_ccc}. In stark contrast, real-world wireless communication channels are subject to strict bandwidth constraints and exhibit highly dynamic, unpredictable behaviors.
-When sensors inject massive volumes of full-precision state data into the network at high frequencies, the limited channel capacity is rapidly exhausted, triggering severe network congestion, packet loss, and unpredictable network-induced delays.
+When sensors inject massive volumes of full-precision state data into the network at high frequencies, the limited channel capacity is rapidly exhausted, triggering severe network congestion, packet loss, and unpredictable network-induced delays~\cite{WNDC}.
 
 Under extreme network resource constraints, the traditional "Best-Effort" data transmission protocols are fundamentally 
 inadequate for high-precision physical control~\cite{intro_crc}. Deteriorating communication quality directly disrupts the timeliness and integrity of the control feedback loop, causing severe trajectory jittering, control divergence, and ultimately, system failure during delicate manipulation tasks.
 Consequently, the critical challenge in modern Cyber-Physical Systems (CPS) lies in drastically reducing the communication data payload under extreme bandwidth limitations while simultaneously guaranteeing the control stability and tracking precision of the robot.
 \subsection{The Fallacy of Separation and the Need for JCC}
-Historically, the design of networked control systems has been heavily influenced by Shannon’s Separation Principle, which posits that source coding (data compression) and channel coding (error protection) can be designed independently without any loss of optimality. In the context of robotic control, 
+Historically, the communication-theoretic view of networked control has been influenced by Shannon’s source--channel separation principle, which asserts that under ideal asymptotic assumptions (e.g., stationary memoryless channels with arbitrarily long blocklengths and delay-tolerant operation), source coding (data compression) and channel coding (error protection) can be designed independently without sacrificing information-theoretic optimality. In the context of robotic control, 
 this principle translates into a rigid decoupling between communication protocols and control algorithms~\cite{intro_cucc}. 
-Communication engineers typically design systems to minimize the generic reconstruction error of the transmitted data—often utilizing uniform quantization and periodic transmission mechanisms—while control engineers develop algorithms under the unrealistic assumption of perfect, continuous data reception.
+Communication engineers typically design systems to minimize the generic reconstruction error of the transmitted data--often utilizing uniform quantization and periodic transmission mechanisms--while control engineers develop algorithms under the unrealistic assumption of perfect, continuous data reception.
 However, this artificial separation is fundamentally flawed in resource-constrained cyber-physical systems. Treating all sensory data equally blindly ignores the intrinsic "control-criticality" of the physical states.
 In multi-DOF robotic manipulators, minor deviations in specific joints can lead to drastically different physical consequences, rendering uniform compression highly inefficient and prone to causing catastrophic system instability~\cite{intro_rct}.
 
@@ -32,15 +32,15 @@ and tracking precision of the physical plant.
 Specifically, this thesis implements the JCC paradigm through two complementary technical approaches. 
 In the temporal domain, the rigid, high-frequency periodic transmission is replaced by an Event-Triggered Control (ETC) mechanism~\cite{intro_etr}. 
 ETC ensures that sensor data is transmitted over the network only when the physical state deviation crosses a predefined safety threshold, effectively eliminating redundant data exchange during stable operational phases.
-In the spatial domain, the proposed framework exploits the mechanical lever effect inherent in robotic manipulators--where
-errors in base joints exponentially magnify end-effector deviations compared to errors in distal joints.  
-By dynamically evaluating the real-time sensitivity of each joint, the system executes non-uniform, weighted bandwidth allocation, stripping communication resources from robust linkages to guarantee the high-precision transmission of critical joint states~\cite{intro_mbe}.
+In the spatial domain, the proposed framework exploits a physics-induced sensitivity hierarchy across state dimensions--where
+perturbations in certain control-critical states (e.g., base joints in manipulators or attitude angles in UAVs) induce disproportionately large task-level errors compared to other states.  
+By dynamically evaluating real-time state sensitivity, the system executes non-uniform, weighted bandwidth allocation, reallocating bits from low-impact dimensions to protect the high-precision transmission of control-critical states~\cite{intro_mbe}.
 \begin{figure}
     \includegraphics[width=\textwidth]{Figures/intro1}
     \caption{System Paradigm Comparison between Traditional NCS and Proposed JCC.}
 \end{figure}
 \subsection{AI-Driven Dynamic Allocation}
-While static, control-aware allocation methods—such as those based on Linear Quadratic Regulator (LQR) sensitivity matrices—offer significant improvements over uniform compression, 
+While static, control-aware allocation methods--such as those based on Linear Quadratic Regulator (LQR) sensitivity matrices--offer significant improvements over uniform compression, 
 they suffer from inherent limitations. Previous research in NCS has extensively explored static resource allocation and Value-of-Information (VoI) based scheduling to optimize bandwidth usage~\cite{intro_opm}. 
 However, these traditional methodologies largely rely on linearized models and fixed sensitivity weightings. In real-world applications, the dynamics of multi-DOF robotic manipulators are highly nonlinear; 
 the sensitivity of each joint varies dynamically in real-time depending on the robot's current posture, velocity, and external payloads. 
@@ -49,7 +49,7 @@ Consequently, static allocation policies inevitably result in sub-optimal perfor
 To overcome the limitations of static models and resolve this complex, nonlinear dynamic resource allocation game, 
 this thesis introduces Deep Reinforcement Learning (DRL) into the communication protocol design. 
 Recently, DRL has demonstrated exceptional capabilities in handling high-dimensional, continuous control and scheduling problems within cyber-physical environments, 
-bridging the gap between optimal control theory and adaptive communication~\cite{intro_drl}. 
+bridging the gap between optimal control theory and adaptive communication~\cite{intro_drl,ADRLCN}. 
 Specifically, this work employs the Proximal Policy Optimization (PPO) algorithm~\cite{intro_ppoa}, 
 which is highly favored for its robust convergence properties, sample efficiency, and stability in continuous action spaces.
 
@@ -60,18 +60,24 @@ During critical maneuvers, the DRL agent proactively strips communication bandwi
 This learning-based dynamic allocation ensures optimal system resilience under extreme network constraints.
 \subsection{Research Objectives and Contributions}
 The primary objective of this thesis is to formulate, implement, and evaluate an intelligent, Deep Reinforcement Learning (DRL)-driven Joint Communication and Control (JCC) framework. 
-This framework aims to guarantee precise and stable trajectory tracking for multi-degree-of-freedom (Multi-DOF) robotic manipulators operating over extreme bottleneck communication channels—specifically under conditions where available bandwidth is severely restricted to less than 10\% of the ideal requirement. 
+This framework aims to guarantee precise and stable trajectory tracking for multi-degree-of-freedom (Multi-DOF) robotic manipulators operating over extreme bottleneck communication channels--specifically under conditions where available bandwidth is severely restricted to less than 10\% of the ideal requirement. 
 By seamlessly integrating temporal event-triggered mechanisms with spatial dynamic bandwidth allocation, this research seeks to resolve the fundamental trade-off between communication efficiency and physical control stability in modern networked cyber-physical systems.
 
 To achieve the aforementioned objectives, the core contributions of this thesis are summarized as follows:
 \begin{enumerate}
-    \item \textbf{Development of a High-Fidelity Cyber-Physical Testbed}: A comprehensive closed-loop control simulation environment was constructed utilizing the PyBullet physics engine. This testbed faithfully replicates realistic kinematic and dynamic constraints of robotic manipulators, providing a robust and reproducible foundation for evaluating networked control algorithms.
-    \item \textbf{Implementation of a Hybrid ETC and LQR-Weighted Benchmark}: A baseline evaluation system was designed by integrating Event-Triggered Control (ETC) in the temporal domain with Linear Quadratic Regulator (LQR)-based static weighted compression in the spatial domain. This benchmark successfully validates the necessity of control-aware, non-uniform data compression over traditional periodic and uniform methods.
-    \item \textbf{Design of a Novel DRL-Driven Context-Aware Allocator}: As the primary innovation, this thesis proposes a dynamic bandwidth allocator powered by the Proximal Policy Optimization (PPO) algorithm. The DRL agent organically learns a "pragmatic communication" strategy by directly observing nonlinear tracking errors and optimizing real-time bandwidth distribution without relying on fixed linear mathematical approximations.
-    \item \textbf{Empirical Validation of Extreme Bandwidth Compression}: Extensive experimental evaluations demonstrate the superiority of the proposed PPO-driven framework. The intelligent agent successfully compressed the communication data payload to under 6\% of the ideal baseline channel capacity, while effectively eliminating trajectory jitter and maintaining near-perfect tracking precision for highly sensitive joints.
+    \item \textbf{Development of a High-Fidelity Cyber-Physical Evaluation Suite}: A comprehensive closed-loop experimental suite was constructed using the PyBullet physics engine, spanning diverse plants including a 7-DOF industrial manipulator, a quadrotor UAV, and a custom edge manipulator with a calibrated Digital Twin and physical hardware deployment. This suite provides a robust and reproducible foundation for evaluating bandwidth-limited networked control algorithms.
+    \item \textbf{Implementation of Temporal ETC and Spatial Static Baselines}: A baseline evaluation pipeline was established by integrating Event-Triggered Control (ETC) in the temporal domain with standardized static spatial allocation baselines, including uniform allocation and LQR-weighted bit allocation. This benchmark suite validates the necessity of control-aware, non-uniform compression beyond periodic and uniform methods.
+    \item \textbf{Design of a DRL-Driven Context-Aware Allocator}: As the primary innovation, this thesis proposes a dynamic bandwidth allocator powered by the Proximal Policy Optimization (PPO) algorithm. The DRL agent learns a pragmatic communication policy by observing real-time tracking errors and physical states, optimizing bandwidth distribution without relying on fixed linear sensitivity approximations.
+    \item \textbf{Empirical Validation under Extreme Bandwidth Constraints}: Extensive evaluations across the three plant scenarios demonstrate the superiority of the proposed PPO-driven framework. The learned allocator can compress payloads to under 6\% of the ideal baseline in representative settings, while maintaining stable closed-loop behavior and near-ideal task-level tracking performance by prioritizing control-critical state dimensions.
 \end{enumerate}
 % TODO: 我要加上物理使用机械臂的部分 所以相关的东西还要改一下 特别是之后的描述的语言！！！！
 % TODO: 审查intro部分的具体数据是否和实验结果吻合
 \subsection{Thesis Organization}
 % TODO: 根据之后的计划补上这一部分，要检查清楚
-
+\begin{itemize}
+    \item \textbf{Chapter 2: System Modeling and Methodology}: establishes the rigorous mathematical models of the cyber-physical plants and formally introduces the proposed Deep Reinforcement Learning (DRL)-driven Joint Communication and Control (JCC) architecture.
+    \item \textbf{Chapter 3: Cyber-Physical Experiments and Results}: presents a comprehensive empirical evaluation across diverse simulated and digital twin environments to demonstrate the framework's superiority over traditional baselines under extreme bandwidth constraints.
+    \item \textbf{Chapter 4: Discussion}: synthesizes the experimental findings to provide deep theoretical interpretations of pragmatic communication and outlines critical engineering strategies for bridging the Sim-to-Real gap.
+    \item \textbf{Chapter 5: Conclusion}: summarizes the core contributions of this research and provides a strategic outlook on future extensions for scalable networked robotic systems.
+    \item \textbf{Appendices}: provide essential technical supplementary materials, including kinematic parameters, training configurations, and algorithmic pseudo-code, to ensure the complete reproducibility of this study.
+\end{itemize}
