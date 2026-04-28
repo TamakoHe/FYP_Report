@@ -29,13 +29,13 @@ To further prevent hardware-damaging torque spikes (derivative safety faults) ca
   \resizebox{0.95\textwidth}{!}{%
   \begin{tikzpicture}[
       base/.style = {rectangle, rounded corners, draw, align=center, font=\small\sffamily, thick},
-      edge/.style = {base, fill=blue!5, draw=blue!70, minimum width=3cm, minimum height=1.2cm},
-      remote/.style = {base, fill=green!5, draw=green!70, minimum width=3cm, minimum height=1.2cm},
-      plant/.style = {base, fill=orange!5, draw=orange!70, minimum width=13cm, minimum height=1.2cm, font=\bfseries\sffamily},
-      network/.style = {cloud, cloud puffs=15, cloud puff arc=120, aspect=2.5, draw=cyan!80, fill=cyan!5, thick, align=center, font=\small\sffamily, minimum height=1.5cm},
+      edge/.style = {base, fill=blue!18, draw=blue!90, minimum width=3cm, minimum height=1.2cm},
+      remote/.style = {base, fill=green!18, draw=green!90, minimum width=3cm, minimum height=1.2cm},
+      plant/.style = {base, fill=orange!18, draw=orange!90, minimum width=13cm, minimum height=1.2cm, font=\bfseries\sffamily},
+      network/.style = {cloud, cloud puffs=15, cloud puff arc=120, aspect=2.5, draw=cyan!90, fill=cyan!20, thick, align=center, font=\small\sffamily, minimum height=1.5cm},
       label/.style = {font=\scriptsize, inner sep=1pt, align=center},
-      arrow/.style = {->, >=stealth, thick, draw=black!80},
-      darrow/.style = {->, >=stealth, thick, dashed, draw=black!80}
+      arrow/.style = {->, >=stealth, thick, draw=black!90},
+      darrow/.style = {->, >=stealth, thick, dashed, draw=black!90}
   ]
 
   % EDGE NODE (Transmitter)
@@ -72,15 +72,15 @@ To further prevent hardware-damaging torque spikes (derivative safety faults) ca
   \draw[arrow] (actuator.south) -- node[right, font=\footnotesize] {Control Torque ($\tau$)} (actuator.south |- plant.north);
   
   % Feedback from plant to sensor (Routing nicely around the left side)
-  \draw[arrow] (plant.west) -- (-2.2, -5) -- node[left, align=center, font=\footnotesize] {Physical\\State\\Feedback} (-2.2, 0) -- (sensor.west);
+  \draw[arrow] (plant.west) -- (-2.8, -5) -- node[left, align=center, font=\footnotesize] {Physical\\State\\Feedback} (-2.8, 0) -- (sensor.west);
 
   % BACKGROUND BOXES
   \begin{scope}[on background layer]
-      \node[fill=blue!5, rounded corners, draw=blue!30, dashed, thick, fit=(sensor) (drl) (etc) (dpcm), inner sep=0.5cm] (edge_box) {};
-      \node[above, text=blue!80, font=\bfseries\sffamily] at (edge_box.north) {Edge Computing Node (Transmitter)};
+      \node[fill=blue!10, rounded corners, draw=blue!80, dashed, thick, fit=(sensor) (drl) (etc) (dpcm), inner sep=0.5cm] (edge_box) {};
+      \node[above, text=blue!90, font=\bfseries\sffamily] at (edge_box.north) {Edge Computing Node (Transmitter)};
       
-      \node[fill=green!5, rounded corners, draw=green!30, dashed, thick, fit=(zoh) (actuator), inner sep=0.5cm] (remote_box) {};
-      \node[above, text=green!80, font=\bfseries\sffamily] at (remote_box.north) {Remote Control Node (Receiver)};
+      \node[fill=green!10, rounded corners, draw=green!80, dashed, thick, fit=(zoh) (actuator), inner sep=0.5cm] (remote_box) {};
+      \node[above, text=green!90, font=\bfseries\sffamily] at (remote_box.north) {Remote Control Node (Receiver)};
   \end{scope}
 
   \end{tikzpicture}
@@ -97,7 +97,7 @@ For the high-DOF industrial manipulator (e.g., the 7-DOF Franka Emika Panda), th
 \begin{equation}
     T_n^0(q) = \prod_{i=1}^n A_i^{i-1}(q_i) = \begin{bmatrix} R_n^0(q) & p_n^0(q) \\ \mathbf{0}_{1 \times 3} & 1 \end{bmatrix}
 \end{equation}
-Here $T_n^0(q) \in SE(3)$ is a rigid-body transform: the top-left block $R_n^0(q) \in SO(3)$ is a 3$\times$3 rotation matrix describing orientation, and the top-right block $p_n^0(q) \in \mathbb{R}^3$ is the end-effector position. Each $q_i$ is the $i$-th joint angle (or displacement for prismatic joints), so changing $q$ changes both $R_n^0$ and $p_n^0$.
+here $T_n^0(q) \in SE(3)$ is a rigid-body transform: the top-left block $R_n^0(q) \in SO(3)$ is a 3$\times$3 rotation matrix describing orientation, and the top-right block $p_n^0(q) \in \mathbb{R}^3$ is the end-effector position. Each $q_i$ is the $i$-th joint angle (or displacement for prismatic joints), so changing $q$ changes both $R_n^0$ and $p_n^0$.
 
 The dynamic behavior of the rigid-body manipulator is formulated using the Euler-Lagrange equations~\cite{RMPC}. First, we define the total kinetic energy $\mathcal{K}(q, \dot{q})$ and potential energy $\mathcal{P}(q)$ of the system:
 \begin{equation}

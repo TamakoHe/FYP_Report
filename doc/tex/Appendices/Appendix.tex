@@ -14,7 +14,7 @@
     \midrule
     0 (Base) & 2.90 & -       & -      & -      & -  \\
     1        & 2.70 & -2.9671 & 2.9671 & 2.1750 & 87 \\
-    2        & 2.73 & -1.8326 & 1HH8326 & 2.1750 & 87 \\
+    2        & 2.73 & -1.8326 & 1.8326 & 2.1750 & 87 \\
     3        & 2.04 & -2.9671 & 2.9671 & 2.1750 & 87 \\
     4        & 2.08 & -3.1416 & 0.0000 & 2.1750 & 87 \\
     5        & 3.00 & -2.9671 & 2.9671 & 2.6100 & 12 \\
@@ -67,7 +67,7 @@ Since the Franka Emika Panda consists exclusively of revolute joints, $\theta_i$
     \bottomrule
   \end{tabular}
 \end{table}
-\textbf{Note: }The negative Z-offset ($\Delta Z = -0.05$ m) for the Center of Mass intentionally creates a physical "pendulum effect", significantly enhancing the UAV's passive aerodynamic stability and robustness against wind disturbances during reinforcement learning training.
+\textbf{Note:} The negative Z-offset ($\Delta Z = -0.05$ m) for the Center of Mass intentionally creates a physical ``pendulum effect'', significantly enhancing the UAV's passive aerodynamic stability and robustness against wind disturbances during reinforcement learning training.
 \begin{table}[H]
   \centering
   \renewcommand{\arraystretch}{1.5} % 适当调整行高使排版更清晰
@@ -90,14 +90,13 @@ To ensure the complete reproducibility of the deep reinforcement learning (DRL) 
 Given the complex, expanded 34-dimensional spatial-aware observation space (incorporating generalized coordinates, velocities, and 3D Euclidean tracking errors), a high-capacity neural architecture was essential to capture the non-linear mapping between spatial tracking and bandwidth distribution. 
 Both the Actor (Policy) network and the Critic (Value) network share a symmetric Multilayer Perceptron (MLP) design, though their weights are completely independent:
 \begin{itemize}
-    \item \textbf{Input Layer}: Matches the observation dimension (34 for the 7-DOF manipulator, 36 for the 12-dimensional UAV, and 22 for the edge manipulator).
-    \item \textbf{Hidden Layers}: Two dense linear layers, each comprising exactly \textbf{256 neurons}, intertwined with Rectified Linear Unit (ReLU) activation functions to introduce necessary non-linearities.
-    \item \textbf{Output Layer}: \textit{Actor}: Maps to the action dimension (e.g., 7 for Franka), outputting unbounded continuous values which are subsequently squashed by a deterministic Softmax layer into valid bit dicstributions
-          , \textit{Critic}:  A single neuron outputting the scalar baseline value estimation $V(s)$.
+    \item \textbf{Input Layer}: Matches the observation dimension (34 for the 7-DOF manipulator, 36 for the 12-dimensional UAV, and 21 for the edge manipulator).
+    \item \textbf{Hidden Layers}: Two dense linear layers, each comprising exactly \textbf{256 neurons}, intertwined with Rectified Linear Unit (ReLU) activation functions to introduce necessary nonlinearities.
+    \item \textbf{Output Layer}: \textit{Actor}: Maps to the action dimension (e.g., 7 for Franka), outputting unbounded continuous values which are subsequently squashed by a deterministic Softmax layer into valid bit distributions; \textit{Critic}: A single neuron outputting the scalar baseline value estimation $V(s)$.
 \end{itemize}
 \subsection{PPO Hyperparameter Configuration}
 The training pipeline was executed utilizing the \inlinecode{stable-baselines3} library.
-To prevent catastrophic forgetting during the exploration of highly discontinuous quantization terrains and to suppress physics-induced gradient explosions, the hyperparameters were fine-tuned as listed in Table.~\ref{tab:ppo_hyperparams}.
+To mitigate policy instability during the exploration of highly discontinuous quantization terrains and to suppress physics-induced gradient spikes, the hyperparameters were fine-tuned as listed in Table~\ref{tab:ppo_hyperparams}.
 \begin{table}[H]
   \centering
   \renewcommand{\arraystretch}{1.5} % 适当调整行高使排版更清晰
@@ -109,7 +108,7 @@ To prevent catastrophic forgetting during the exploration of highly discontinuou
     \toprule
     Hyperparameter & Symbol & Value & Description \\
     \midrule
-    \textbf{Learning Rate} & $\alpha$ & $3 \times 10^{-4}$ (Linear Decay) & Employs a linear decay schedule from initial value to 0.0, stabilizing steady-state convergence. \\
+    \textbf{Learning Rate} & $\alpha$ & $3 \times 10^{-4}$ & Learning rate for the policy and value function optimizers. \\
     
     \textbf{Discount Factor} & $\gamma$ & $0.99$ & High emphasis on long-term reward maximization. \\
     
@@ -134,7 +133,7 @@ To prevent catastrophic forgetting during the exploration of highly discontinuou
   \end{tabularx}
 \end{table}
 \section{Appendix C: Digital Twin Configuration of the Edge Manipulator}
-To validate the proposed Joint Communication and Control (JCC) framework's deployability on resource-constrained edge devices, a high-fidelity Digital Twin of a custom 5-Degree-of-Freedom (5-DOF) serial manipulator (based on the Jiobt1 hardware architecture) was constructed using the Unified Robot Description Format (URDF). 
+To validate the proposed Joint Communication and Control (JCC) framework's deployability on resource-constrained edge devices, a high-fidelity Digital Twin of a custom 5-degree-of-freedom (5-DOF) serial manipulator (based on the Jibot1 hardware architecture) was constructed using the Unified Robot Description Format (URDF). 
 This appendix details the precise kinematic dimensions, empirical mass distributions, and the critical soft-servo emulation parameters utilized during the composite stress tests in Section~\ref{sec:dtc}.
 \subsection{Kinematic Dimensions and Mass Distribution}
 Unlike industrial-grade manipulators, edge actuators are characterized by lightweight, cost-effective materials. The total system mass was calibrated to strictly match the physical hardware ($m_{total} = 1.24$ kg). The length of each segment and its corresponding mass are detailed in Table.~\ref{tab:manipulator_properties}.
@@ -160,7 +159,7 @@ Unlike industrial-grade manipulators, edge actuators are characterized by lightw
 In theoretical simulations, actuators are frequently modeled with infinite stiffness and instantaneous torque delivery. 
 However, low-cost Internet of Things (IoT) manipulators are typically driven by commercial Pulse-Width Modulation (PWM) servos (e.g., standard 25 kg·cm servos), which exhibit significant mechanical compliance, gear backlash, and torque limitations.
 
-To bridge the Sim-to-Real gap and accurately simulate the "physical sagging" observed when a heavy payload is applied, the physics engine was injected with specific \textbf{Soft-Servo Emulation Parameters} during the execution of control commands:
+To bridge the Sim-to-Real gap and accurately simulate the ``physical sagging'' observed when a heavy payload is applied, the physics engine was injected with specific \textbf{Soft-Servo Emulation Parameters} during the execution of control commands:
 \begin{itemize}
     \item \textbf{Maximum Output Torque ($F_{max}$)}: The maximum output torque for all joints was software-capped at $2.5\;\mathbf{N\cdot m}$  (approximately equivalent to a 25.5 kg$\cdot$cm servo). This deliberate bottleneck ensures that the unmodeled $0.8$ kg payload in the stress test severely overloads the shoulder actuator, forcing the allocation algorithms to prove their adaptive limits.
     \item \textbf{Position Gain ($K_p$)}: Set to a low value of $0.05$. This proportional gain introduces realistic physical compliance into the digital twin. Instead of rigidly locking into position, the simulated joints exhibit a spring-like flexibility, accurately replicating the hardware jitter and trajectory deflection typical of overloaded, low-cost edge robots.
