@@ -30,7 +30,7 @@ To further prevent hardware-damaging torque spikes (derivative safety faults) ca
   \begin{tikzpicture}[
       base/.style = {rectangle, rounded corners, draw, align=center, font=\small\sffamily, thick},
       edge/.style = {base, fill=blue!18, draw=blue!90, minimum width=3cm, minimum height=1.2cm},
-      remote/.style = {base, fill=green!18, draw=green!90, minimum width=3cm, minimum height=1.2cm},
+      remote/.style = {base, fill=red!18, draw=red!90, minimum width=3cm, minimum height=1.2cm},
       plant/.style = {base, fill=orange!18, draw=orange!90, minimum width=13cm, minimum height=1.2cm, font=\bfseries\sffamily},
       network/.style = {cloud, cloud puffs=15, cloud puff arc=120, aspect=2.5, draw=cyan!90, fill=cyan!20, thick, align=center, font=\small\sffamily, minimum height=1.5cm},
       label/.style = {font=\scriptsize, inner sep=1pt, align=center},
@@ -47,8 +47,8 @@ To further prevent hardware-damaging torque spikes (derivative safety faults) ca
   % REMOTE NODE (Receiver)
   \node[network] (channel) at (11.2, 0) {Bandwidth-Limited \\ Stochastic Channel \\ ($f_{comm} = 10$ Hz)};
   
-  \node[remote] (zoh) at (16.6, 0) {ZOH \& Spline \\ Interpolator};
-  \node[remote] (actuator) at (16.6, -2.5) {Motor Drives \\ ($f_{ctrl} = 240$ Hz)};
+  \node[remote] (zoh) at (17.2, 0) {ZOH \& Spline \\ Interpolator};
+  \node[remote] (actuator) at (17.2, -2.5) {Motor Drives \\ ($f_{ctrl} = 240$ Hz)};
 
   % PHYSICAL PLANT
   \node[plant] (plant) at (8.8, -5) {Physical Plant (Robotic Manipulator / UAV)};
@@ -69,7 +69,7 @@ To further prevent hardware-damaging torque spikes (derivative safety faults) ca
   \draw[arrow] (zoh.south) -- node[right, font=\footnotesize] {Smooth Trajectory $u(t)$} (actuator.north);
 
   % ARROWS - CLOSED LOOP
-  \draw[arrow] (actuator.south) -- node[right, font=\footnotesize] {Control Torque ($\tau$)} (actuator.south |- plant.north);
+  \draw[arrow] (actuator.south) -- node[right, font=\footnotesize] {Control Torque ($\tau$)} (actuator.south |- plant.east) -- (plant.east);
   
   % Feedback from plant to sensor (Routing nicely around the left side)
   \draw[arrow] (plant.west) -- (-2.8, -5) -- node[left, align=center, font=\footnotesize] {Physical\\State\\Feedback} (-2.8, 0) -- (sensor.west);
@@ -79,8 +79,8 @@ To further prevent hardware-damaging torque spikes (derivative safety faults) ca
       \node[fill=blue!10, rounded corners, draw=blue!80, dashed, thick, fit=(sensor) (drl) (etc) (dpcm), inner sep=0.5cm] (edge_box) {};
       \node[above, text=blue!90, font=\bfseries\sffamily] at (edge_box.north) {Edge Computing Node (Transmitter)};
       
-      \node[fill=green!10, rounded corners, draw=green!80, dashed, thick, fit=(zoh) (actuator), inner sep=0.5cm] (remote_box) {};
-      \node[above, text=green!90, font=\bfseries\sffamily] at (remote_box.north) {Remote Control Node (Receiver)};
+      \node[fill=red!10, rounded corners, draw=red!80, dashed, thick, fit=(zoh) (actuator), inner sep=0.5cm] (remote_box) {};
+      \node[above, text=red!90, font=\bfseries\sffamily] at (remote_box.north) {Remote Control Node (Receiver)};
   \end{scope}
 
   \end{tikzpicture}
